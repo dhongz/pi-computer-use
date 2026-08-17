@@ -19,6 +19,11 @@ The central design decision is:
 A Node REPL is not required. A persistent MCP server is sufficient and is the
 preferred first implementation.
 
+The proposed structured response and request contract is documented in
+[`docs/api-contract.md`](api-contract.md). The implementation should expose
+structured state and action receipts while retaining concise text content for
+clients that do not render structured MCP results.
+
 ## Current gaps
 
 The v0.1 backend currently has these limitations:
@@ -116,6 +121,10 @@ final class ComputerUseSession {
 - Query-based targeting remains available for stable controls.
 
 ## Proposed tool contract
+
+The contract details for structured envelopes, state snapshots, targets, action
+receipts, errors, capabilities, and OCR providers are in
+[`docs/api-contract.md`](api-contract.md).
 
 The MCP server may continue exposing unprefixed tool names; Pi will namespace them
 as `pi-computer-use_*`.

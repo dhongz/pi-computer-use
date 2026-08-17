@@ -160,6 +160,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 ## Roadmap
 
 - [Stateful Computer Use v0.2 plan](docs/stateful-computer-use-plan.md)
+- [Computer Use API contract](docs/api-contract.md)
 - [OCR strategy](docs/ocr-strategy.md)
 
 ## Attribution

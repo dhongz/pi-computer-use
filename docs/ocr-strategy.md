@@ -88,13 +88,18 @@ VisionOCRProvider
   → OCRToken(text, confidence, normalizedBounds)
 ```
 
-Possible later providers:
+Possible additional providers:
 
 ```text
 MLXOCRProvider
 OnnxOCRProvider
-RemoteOCRProvider (opt-in only)
+HTTPAPIProvider (explicitly configured and opt-in)
 ```
+
+An HTTP/API provider can send a bounded screenshot region to a third-party OCR
+service. It must be explicit, policy-controlled, and visible in the structured
+response as a remote provider. API keys belong in environment variables, the
+macOS Keychain, or host-managed secrets—not in tool arguments.
 
 No remote provider should be enabled by default because screenshots can contain
 credentials, private messages, customer data, or internal dashboards.
@@ -203,7 +208,14 @@ set from Chrome, Slack, LinkedIn, and canvas-style apps. Compare:
 ## Privacy and security
 
 - OCR is local by default.
-- Do not send screenshots to a remote provider without explicit user authorization.
+- Remote/API OCR is disabled unless explicitly configured and allowed by host policy.
+- Do not send screenshots to a remote provider without authorization for the
+  specific destination and data.
+- When a screenshot may contain credentials, private messages, customer data, or
+  other sensitive information, require the appropriate confirmation before upload.
+- Identify the OCR provider, whether it was remote, confidence, and latency in the
+  structured result.
+- API keys must come from environment variables, Keychain, or host-managed secrets.
 - Do not persist OCR output beyond the Computer Use session unless requested.
 - Redact or suppress OCR logs by default.
 - Treat all OCR text as untrusted third-party UI content.
