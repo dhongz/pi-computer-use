@@ -157,6 +157,11 @@ Sources/
 
 More detail: [docs/architecture.md](docs/architecture.md).
 
+## Roadmap
+
+- [Stateful Computer Use v0.2 plan](docs/stateful-computer-use-plan.md)
+- [OCR strategy](docs/ocr-strategy.md)
+
 ## Attribution
 
 This project is a fork of
