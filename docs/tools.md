@@ -192,19 +192,19 @@ Read or replace **general pasteboard** text (global clipboard).
 
 | MCP tool | CLI |
 |---|---|
-| `list_apps` | `ocu apps` |
-| `get_ax_tree` | `ocu tree --bundle-id …` |
-| `ax_tree_json` | `ocu tree --bundle-id … --json` |
-| `find_element` | `ocu find …` |
-| `click_element` | `ocu click …` |
-| `activate` | `ocu activate …` |
-| `type_text` | `ocu type --text …` |
-| `key_press` | `ocu key --key … --mods cmd` |
-| `wait_for` | `ocu wait …` |
-| `scroll` | `ocu scroll …` |
-| `right_click` | `ocu rclick …` |
-| `screenshot` | `ocu shot` |
-| `menu` | `ocu menu …` |
-| `clip_get` / `clip_set` | `ocu clip get` / `ocu clip set` |
+| `list_apps` | `pi-computer-use apps` |
+| `get_ax_tree` | `pi-computer-use tree --bundle-id …` |
+| `ax_tree_json` | `pi-computer-use tree --bundle-id … --json` |
+| `find_element` | `pi-computer-use find …` |
+| `click_element` | `pi-computer-use click …` |
+| `activate` | `pi-computer-use activate …` |
+| `type_text` | `pi-computer-use type --text …` |
+| `key_press` | `pi-computer-use key --key … --mods cmd` |
+| `wait_for` | `pi-computer-use wait …` |
+| `scroll` | `pi-computer-use scroll …` |
+| `right_click` | `pi-computer-use rclick …` |
+| `screenshot` | `pi-computer-use shot` |
+| `menu` | `pi-computer-use menu …` |
+| `clip_get` / `clip_set` | `pi-computer-use clip get` / `pi-computer-use clip set` |
 
-Run `ocu --help` for the full list.
+Run `pi-computer-use --help` for the full list.

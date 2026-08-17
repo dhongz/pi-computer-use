@@ -1,9 +1,9 @@
 # MCP client examples
 
-Replace `/path/to/open-computer-use` with your checkout, or install the release binary:
+Replace `/path/to/pi-computer-use` with your checkout, or install the release binary:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nogu66/open-computer-use/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dhongz/pi-computer-use/main/scripts/install.sh | bash
 ```
 
 | File | Client |

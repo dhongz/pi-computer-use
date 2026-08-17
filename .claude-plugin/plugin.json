@@ -1,10 +1,10 @@
 {
-  "name": "open-computer-use",
+  "name": "pi-computer-use",
   "description": "macOS computer use for AI agents — control logged-in Chrome and native apps via Accessibility API and MCP",
   "version": "0.1.0",
   "author": {
-    "name": "nogu66"
+    "name": "dhongz"
   },
-  "repository": "https://github.com/nogu66/open-computer-use",
+  "repository": "https://github.com/dhongz/pi-computer-use",
   "license": "MIT"
 }

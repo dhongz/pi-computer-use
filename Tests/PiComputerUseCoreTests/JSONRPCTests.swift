@@ -1,10 +1,10 @@
 //
 //  JSONRPCTests.swift
-//  OpenComputerUse / OCUCoreTests
+//  PiComputerUse / PiComputerUseCoreTests
 //
 
 import XCTest
-@testable import OCUCore
+@testable import PiComputerUseCore
 
 final class JSONRPCTests: XCTestCase {
 

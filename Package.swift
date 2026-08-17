@@ -1,34 +1,42 @@
 // swift-tools-version: 5.9
 //
-// open-computer-use (ocu)
+// pi-computer-use
 // macOS computer use via Accessibility API + CGEvent, exposed as both an MCP
-// stdio server and a CLI. https://github.com/nogu66/open-computer-use
+// stdio server and a CLI.
+//
+// Forked from nogu66/open-computer-use (MIT License).
 //
 import PackageDescription
 
 let package = Package(
-    name: "OpenComputerUse",
+    name: "PiComputerUse",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "ocu", targets: ["ocu"]),
-        .library(name: "OCUCore", targets: ["OCUCore"])
+        .executable(name: "pi-computer-use", targets: ["PiComputerUseCLI"]),
+        .library(name: "PiComputerUseCore", targets: ["PiComputerUseCore"]),
+        .library(name: "PiComputerUseMac", targets: ["PiComputerUseMac"])
     ],
     targets: [
         .target(
-            name: "OCUCore",
-            path: "Sources/OCUCore"
+            name: "PiComputerUseCore",
+            path: "Sources/PiComputerUseCore"
+        ),
+        .target(
+            name: "PiComputerUseMac",
+            dependencies: ["PiComputerUseCore"],
+            path: "Sources/PiComputerUseMac"
         ),
         .executableTarget(
-            name: "ocu",
-            dependencies: ["OCUCore"],
-            path: "Sources/ocu"
+            name: "PiComputerUseCLI",
+            dependencies: ["PiComputerUseCore", "PiComputerUseMac"],
+            path: "Sources/pi-computer-use"
         ),
         .testTarget(
-            name: "OCUCoreTests",
-            dependencies: ["OCUCore"],
-            path: "Tests/OCUCoreTests"
+            name: "PiComputerUseCoreTests",
+            dependencies: ["PiComputerUseCore"],
+            path: "Tests/PiComputerUseCoreTests"
         )
     ]
 )

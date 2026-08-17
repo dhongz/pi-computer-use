@@ -1,11 +1,11 @@
 {
-  "name": "open-computer-use",
+  "name": "pi-computer-use",
   "interface": {
-    "displayName": "open-computer-use"
+    "displayName": "pi-computer-use"
   },
   "plugins": [
     {
-      "name": "open-computer-use",
+      "name": "pi-computer-use",
       "source": {
         "source": "local",
         "path": "./"

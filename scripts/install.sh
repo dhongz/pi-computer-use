@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Install ocu to ~/.local/bin from GitHub Release (default: latest).
+# Install pi-computer-use to ~/.local/bin from GitHub Release (default: latest).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/github-release.sh
 source "$ROOT/scripts/lib/github-release.sh"
 
-REPO="$(ocu_default_repo)"
+REPO="$(pcu_default_repo)"
 DEST="${INSTALL_DIR:-$HOME/.local/bin}"
-VERSION="${OCU_VERSION:-latest}"
+VERSION="${PCU_VERSION:-latest}"
 FROM_SOURCE=0
 
 usage() {
   cat <<EOF
 Usage: $(basename "$0") [options]
 
-Install the ocu CLI/MCP binary for macOS.
+Install the pi-computer-use CLI/MCP binary for macOS.
 
 Options:
   --version TAG     Release tag to install (default: latest)
@@ -24,9 +24,9 @@ Options:
 
 Environment:
   INSTALL_DIR       Install destination (default: ~/.local/bin)
-  OCU_VERSION       Same as --version
-  OCU_GITHUB_REPO   GitHub repo (default: nogu66/open-computer-use)
-  OCU_QUIET=1       Suppress informational output
+  PCU_VERSION       Same as --version
+  PCU_GITHUB_REPO   GitHub repo (default: dhongz/pi-computer-use)
+  PCU_QUIET=1       Suppress informational output
 
 Examples:
   $(basename "$0")
@@ -61,15 +61,15 @@ install_binary() {
   local bin
 
   if [[ "$FROM_SOURCE" -eq 1 ]]; then
-    bin="$(ocu_install_from_source "$ROOT" "$DEST")"
+    bin="$(pcu_install_from_source "$ROOT" "$DEST")"
   else
-  if ! bin="$(ocu_install_from_release "$REPO" "$VERSION" "$DEST")"; then
-    echo "==> Release download failed; falling back to source build" >&2
-    bin="$(ocu_install_from_source "$ROOT" "$DEST")"
-  fi
+    if ! bin="$(pcu_install_from_release "$REPO" "$VERSION" "$DEST")"; then
+      echo "==> Release download failed; falling back to source build" >&2
+      bin="$(pcu_install_from_source "$ROOT" "$DEST")"
+    fi
   fi
 
-  if [[ "${OCU_QUIET:-}" != "1" ]]; then
+  if [[ "${PCU_QUIET:-}" != "1" ]]; then
     echo "==> Installed: $bin"
     "$bin" --version
     echo ""
@@ -77,7 +77,7 @@ install_binary() {
     echo "  export PATH=\"$DEST:\$PATH\""
     echo ""
     echo "MCP example:"
-    echo "  claude mcp add open-computer-use -- $bin"
+    echo "  pi mcp add pi-computer-use -- $bin"
   fi
 }
 

@@ -3,8 +3,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# shellcheck source=resolve-ocu.sh
-source "${ROOT}/scripts/resolve-ocu.sh"
+# shellcheck source=resolve-pcu.sh
+source "${ROOT}/scripts/resolve-pcu.sh"
 
-OCU="$(resolve_ocu "${ROOT}")"
-exec "${OCU}" "$@"
+PCU="$(resolve_pcu "${ROOT}")"
+exec "${PCU}" "$@"

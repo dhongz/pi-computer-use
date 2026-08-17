@@ -1,49 +1,55 @@
 # Architecture
 
-open-computer-use (`ocu`) is a single Swift executable that can run in two modes:
+pi-computer-use is a single Swift executable that can run in two modes:
 
 | Mode | Invocation | stdout |
 |---|---|---|
-| **MCP server** | no args, or `ocu serve` | JSON-RPC lines only |
-| **CLI** | `ocu <subcommand> …` | human text or `--json` |
+| **MCP server** | no args, or `pi-computer-use serve` | JSON-RPC lines only |
+| **CLI** | `pi-computer-use <subcommand> …` | human text or `--json` |
 
-Logging always goes to **stderr** (`[ocu] …`) so MCP framing on stdout stays intact.
+Logging always goes to **stderr** (`[pi-computer-use] …`) so MCP framing on stdout stays intact.
 
 ## Module split
 
 ```
 Package.swift
-├── OCUCore          (library, no AppKit / AX — CI-testable)
+├── PiComputerUseCore          (library, no AppKit / AX — CI-testable)
 │   ├── Version.swift
 │   ├── CLIArgs.swift
 │   └── JSONRPC.swift
-└── ocu              (executable — all macOS-specific code)
-    └── main.swift   (~900 lines, intentional monolith)
+├── PiComputerUseMac           (library — all macOS-specific code)
+│   ├── Accessibility.swift    AX tree walk, find, refs, permissions
+│   ├── Input.swift            CGEvent click/type/key/scroll
+│   ├── Screenshot.swift       screencapture + window id
+│   ├── AppRegistry.swift      list/activate apps
+│   └── Tools.swift            tool implementations + registry
+└── pi-computer-use            (executable)
+    └── main.swift             MCP loop + CLI dispatch
 ```
 
-Permission-sensitive code lives only in `Sources/ocu/main.swift`. Pure helpers
-belong in `OCUCore` with matching tests under `Tests/OCUCoreTests/`.
+Permission-sensitive code lives only in `Sources/PiComputerUseMac`. Pure helpers
+belong in `PiComputerUseCore` with matching tests under `Tests/PiComputerUseCoreTests/`.
 
 ## Control flow (MCP)
 
 ```mermaid
 sequenceDiagram
     participant Agent as MCP client
-    participant OCU as ocu
+    participant PCU as pi-computer-use
     participant AX as AXUIElement
     participant CG as CGEvent
 
-    Agent->>OCU: initialize
-    OCU-->>Agent: capabilities + serverInfo
-    Agent->>OCU: tools/list
-    OCU-->>Agent: tool schemas
-    Agent->>OCU: tools/call (e.g. get_ax_tree)
-    OCU->>AX: copy attribute tree
-    AX-->>OCU: roles, titles, children
-    OCU-->>Agent: numbered text tree + ref map
-    Agent->>OCU: tools/call (click_ref)
-    OCU->>AX: AXPress or CGEvent click
-    OCU-->>Agent: result text
+    Agent->>PCU: initialize
+    PCU-->>Agent: capabilities + serverInfo
+    Agent->>PCU: tools/list
+    PCU-->>Agent: tool schemas
+    Agent->>PCU: tools/call (e.g. get_ax_tree)
+    PCU->>AX: copy attribute tree
+    AX-->>PCU: roles, titles, children
+    PCU-->>Agent: numbered text tree + ref map
+    Agent->>PCU: tools/call (click_ref)
+    PCU->>AX: AXPress or CGEvent click
+    PCU-->>Agent: result text
 ```
 
 ## Element references (`@eN`)
@@ -74,7 +80,7 @@ to Accessibility for some macOS versions.
 
 ## Why not CDP / Playwright?
 
-CDP attaches to a browser process and sees the DOM. `ocu` never enters the
+CDP attaches to a browser process and sees the DOM. `pi-computer-use` never enters the
 browser — it sees the same AX tree as VoiceOver and sends the same events a
 human would. That is why a normal, logged-in Chrome session works without
 exporting cookies or launching a second profile.
@@ -88,5 +94,5 @@ Trade-offs:
 ## CI vs local dev
 
 GitHub Actions runs `swift build` and `swift test` on `macos-14` and `macos-15`.
-Tests cover `OCUCore` only. Integration tests that require Accessibility are not
+Tests cover `PiComputerUseCore` only. Integration tests that require Accessibility are not
 run in CI; use `./scripts/smoke-test.sh` locally after granting permissions.

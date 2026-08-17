@@ -1,6 +1,6 @@
 # Permissions
 
-`ocu` controls the Mac like assistive technology: it reads the accessibility
+`pi-computer-use` controls the Mac like assistive technology: it reads the accessibility
 tree and posts low-level events. macOS gates that behind explicit user consent.
 
 ## Accessibility (required)
@@ -12,11 +12,11 @@ queries or acts on UI elements.
 **Enable:**
 
 1. Open **System Settings → Privacy & Security → Accessibility**
-2. Enable the app that **launches** `ocu`:
+2. Enable the app that **launches** `pi-computer-use`:
    - Claude Code, Cursor, Codex CLI, Terminal, Ghostty, iTerm, etc.
-3. If you run `ocu` directly from Terminal, enable **Terminal** (or your terminal app).
+3. If you run `pi-computer-use` directly from Terminal, enable **Terminal** (or your terminal app).
 
-**First run:** `ocu` calls `AXIsProcessTrustedWithOptions` with the system prompt
+**First run:** `pi-computer-use` calls `AXIsProcessTrustedWithOptions` with the system prompt
 flag so macOS may show a dialog. You can also open the pane manually with:
 
 ```bash
@@ -28,11 +28,11 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibil
 | Symptom | Likely cause |
 |---|---|
 | `Accessibility permission not granted` in tool output | Parent process not listed / toggle off |
-| Empty or tiny AX tree | Target app blocks AX (`AXEnhancedUserInterface` helps; `ocu` sets it) |
+| Empty or tiny AX tree | Target app blocks AX (`AXEnhancedUserInterface` helps; `pi-computer-use` sets it) |
 | Clicks go to the wrong app | Forgot `activate` before `type_text` / `key_press` |
 | Permission granted but still fails | Rebuild renamed the binary; remove and re-add the host app |
 
-`ocu` enables `AXEnhancedUserInterface` and `AXManualAccessibility` on the
+`pi-computer-use` enables `AXEnhancedUserInterface` and `AXManualAccessibility` on the
 target app before walking the tree (same technique many automation tools use).
 
 ## Screen Recording (screenshot only)
@@ -42,7 +42,7 @@ target app before walking the tree (same technique many automation tools use).
 **Enable:** System Settings → Privacy & Security → **Screen Recording** → same
 host process as above.
 
-CLI `ocu shot` uses the same code path. Other tools do not need this permission.
+CLI `pi-computer-use shot` uses the same code path. Other tools do not need this permission.
 
 ## What we do *not* need
 
@@ -53,11 +53,11 @@ CLI `ocu shot` uses the same code path. Other tools do not need this permission.
 ## Security notes for operators
 
 - Any process with Accessibility can observe and manipulate **all** GUI apps.
-- Only register `ocu` with MCP clients you trust.
+- Only register `pi-computer-use` with MCP clients you trust.
 - Tool output may include window titles, field values, and clipboard text — treat logs as sensitive.
 
 ## CI / headless environments
 
 GitHub Actions runners do not grant Accessibility to test jobs. Unit tests in
-`OCUCoreTests` avoid AX APIs entirely. End-to-end verification is a maintainer
+`PiComputerUseCoreTests` avoid AX APIs entirely. End-to-end verification is a maintainer
 or developer machine concern after manual permission setup.

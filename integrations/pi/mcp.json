@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "pi-computer-use": {
-      "command": "${workspaceFolder}/scripts/mcp-server.sh",
+      "command": "/Users/dillon/.local/bin/pi-computer-use",
       "args": []
     }
   }

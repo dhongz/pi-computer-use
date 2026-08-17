@@ -1,9 +1,9 @@
 //
 //  CLIArgs.swift
-//  OpenComputerUse / OCUCore
+//  PiComputerUse / PiComputerUseCore
 //
-//  Pure-Foundation argument parsing for the `ocu` CLI. Kept in a library
-//  target so it can be unit tested independently of the executable.
+//  Pure-Foundation argument parsing for the `pi-computer-use` CLI. Kept in a
+//  library target so it can be unit tested independently of the executable.
 //
 
 import Foundation

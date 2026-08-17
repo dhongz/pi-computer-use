@@ -47,10 +47,10 @@ jobs:
 
       - name: Show binary
         run: |
-          ls -lh .build/release/ocu
-          file .build/release/ocu
-          .build/release/ocu --version
-          .build/release/ocu --help | head -20
+          ls -lh .build/release/pi-computer-use
+          file .build/release/pi-computer-use
+          .build/release/pi-computer-use --version
+          .build/release/pi-computer-use --help | head -20
 
   lint:
     name: Lint (swift-format check)

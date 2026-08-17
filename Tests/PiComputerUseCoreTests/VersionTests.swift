@@ -1,15 +1,15 @@
 //
 //  VersionTests.swift
-//  OpenComputerUse / OCUCoreTests
+//  PiComputerUse / PiComputerUseCoreTests
 //
 
 import XCTest
-@testable import OCUCore
+@testable import PiComputerUseCore
 
 final class VersionTests: XCTestCase {
 
     func testVersionLooksSemver() {
-        let v = OpenComputerUse.version
+        let v = PiComputerUse.version
         let parts = v.split(separator: ".")
         XCTAssertEqual(parts.count, 3, "version '\(v)' must be MAJOR.MINOR.PATCH")
         for p in parts {
@@ -18,6 +18,6 @@ final class VersionTests: XCTestCase {
     }
 
     func testServerNameNotEmpty() {
-        XCTAssertFalse(OpenComputerUse.serverName.isEmpty)
+        XCTAssertFalse(PiComputerUse.serverName.isEmpty)
     }
 }

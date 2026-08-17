@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "open-computer-use": {
+    "pi-computer-use": {
       "command": "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-server.sh",
       "args": []
     }

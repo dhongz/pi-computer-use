@@ -1,6 +1,6 @@
 //
 //  JSONRPC.swift
-//  OpenComputerUse / OCUCore
+//  PiComputerUse / PiComputerUseCore
 //
 //  Tiny helpers for constructing JSON-RPC 2.0 responses used by the MCP
 //  server loop. Kept platform-free so they can be unit tested in CI.

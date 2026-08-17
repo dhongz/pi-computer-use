@@ -6,28 +6,28 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-if [[ -x "$ROOT/.build/release/ocu" ]]; then
-  OCU="$ROOT/.build/release/ocu"
-elif [[ -x "$ROOT/.build/debug/ocu" ]]; then
-  OCU="$ROOT/.build/debug/ocu"
+if [[ -x "$ROOT/.build/release/pi-computer-use" ]]; then
+  PCU="$ROOT/.build/release/pi-computer-use"
+elif [[ -x "$ROOT/.build/debug/pi-computer-use" ]]; then
+  PCU="$ROOT/.build/debug/pi-computer-use"
 else
   echo "==> Building debug binary first"
   swift build
-  OCU="$ROOT/.build/debug/ocu"
+  PCU="$ROOT/.build/debug/pi-computer-use"
 fi
 
-echo "==> Using: $OCU"
-"$OCU" --version
+echo "==> Using: $PCU"
+"$PCU" --version
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+trap 'rm -f "$TMP" "$TMP.stderr" "$TMP.stdout"' EXIT
 
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_apps","arguments":{}}}'
-} | "$OCU" 2>"$TMP.stderr" | tee "$TMP.stdout" >/dev/null
+} | "$PCU" 2>"$TMP.stderr" | tee "$TMP.stdout" >/dev/null
 
 fail() {
   echo "FAIL: $1" >&2
@@ -45,6 +45,6 @@ grep -q '"result"' "$TMP.stdout" || fail 'tools/call missing result'
 
 echo "PASS: MCP smoke test (initialize, tools/list, list_apps)"
 if [[ -s "$TMP.stderr" ]]; then
-  echo "--- ocu stderr (informational) ---"
+  echo "--- pi-computer-use stderr (informational) ---"
   cat "$TMP.stderr"
 fi

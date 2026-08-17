@@ -1,16 +1,16 @@
 # Plugin install guide
 
-Install **open-computer-use** as a plugin for Claude Code, Codex, or Cursor. Each path bundles:
+Install **pi-computer-use** as a plugin for Claude Code, Codex, or Cursor. Each path bundles:
 
-- MCP server (`scripts/mcp-server.sh` → `ocu` stdio)
-- Agent skill (`skills/open-computer-use/SKILL.md`)
+- MCP server (`scripts/mcp-server.sh` → `pi-computer-use` stdio)
+- Agent skill (`skills/pi-computer-use/SKILL.md`)
 
 ## 1. Install the binary (do this first)
 
-Default: download the **latest GitHub Release** to `~/.local/bin/ocu`.
+Default: download the **latest GitHub Release** to `~/.local/bin/pi-computer-use`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nogu66/open-computer-use/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dhongz/pi-computer-use/main/scripts/install.sh | bash
 ```
 
 From a checkout:
@@ -29,51 +29,51 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## 2. Binary resolution (MCP wrappers)
 
-`scripts/mcp-server.sh` and `scripts/ocu-cli.sh` resolve `ocu` in this order:
+`scripts/mcp-server.sh` and `scripts/pcu-cli.sh` resolve `pi-computer-use` in this order:
 
-1. `ocu` on `PATH`
-2. `$OCU_BIN` if set
-3. `~/.local/bin/ocu`
-4. `.build/release/ocu` in the plugin checkout (dev)
-5. Auto-run `scripts/install.sh` (latest release) unless `OCU_SKIP_AUTO_INSTALL=1`
-6. Source build if `OCU_FROM_SOURCE=1` and Swift is available
+1. `pi-computer-use` on `PATH`
+2. `$PCU_BIN` if set
+3. `~/.local/bin/pi-computer-use`
+4. `.build/release/pi-computer-use` in the plugin checkout (dev)
+5. Auto-run `scripts/install.sh` (latest release) unless `PCU_SKIP_AUTO_INSTALL=1`
+6. Source build if `PCU_FROM_SOURCE=1` and Swift is available
 
 ## Claude Code
 
 From Claude Code:
 
 ```text
-/plugin marketplace add nogu66/open-computer-use
-/plugin install open-computer-use@open-computer-use
+/plugin marketplace add dhongz/pi-computer-use
+/plugin install pi-computer-use@pi-computer-use
 /reload-plugins
 ```
 
 Or add a local checkout:
 
 ```text
-/plugin marketplace add /path/to/open-computer-use
-/plugin install open-computer-use@open-computer-use
+/plugin marketplace add /path/to/pi-computer-use
+/plugin install pi-computer-use@pi-computer-use
 ```
 
 Manifest: [`.claude-plugin/plugin.json`](../.claude-plugin/plugin.json)  
 MCP config: [`.mcp.json`](../.mcp.json)
 
-After install, MCP tools appear as `mcp__open-computer-use__*`.
+After install, MCP tools appear as `mcp__pi-computer-use__*`.
 
 ## Codex
 
 Add the GitHub marketplace:
 
 ```bash
-codex plugin marketplace add nogu66/open-computer-use
+codex plugin marketplace add dhongz/pi-computer-use
 ```
 
-Then open the Codex plugin directory, select the **open-computer-use** marketplace, and install the plugin.
+Then open the Codex plugin directory, select the **pi-computer-use** marketplace, and install the plugin.
 
 For a local checkout during development:
 
 ```bash
-codex plugin marketplace add /path/to/open-computer-use
+codex plugin marketplace add /path/to/pi-computer-use
 ```
 
 Manifest: [`.codex-plugin/plugin.json`](../.codex-plugin/plugin.json)  
@@ -86,7 +86,7 @@ Repo marketplace (Codex): [`.agents/plugins/marketplace.json`](../.agents/plugin
 Project files are already wired:
 
 - [`.cursor/mcp.json`](../.cursor/mcp.json)
-- [`.cursor/skills/open-computer-use/SKILL.md`](../.cursor/skills/open-computer-use/SKILL.md)
+- [`.cursor/skills/pi-computer-use/SKILL.md`](../.cursor/skills/pi-computer-use/SKILL.md)
 
 Restart Cursor or reload MCP.
 
@@ -98,8 +98,8 @@ Restart Cursor or reload MCP.
 ```json
 {
   "mcpServers": {
-    "open-computer-use": {
-      "command": "/Users/YOU/.local/bin/ocu",
+    "pi-computer-use": {
+      "command": "/Users/YOU/.local/bin/pi-computer-use",
       "args": []
     }
   }
@@ -111,15 +111,15 @@ Or keep the wrapper for auto-install on first connect:
 ```json
 {
   "mcpServers": {
-    "open-computer-use": {
-      "command": "/Users/YOU/open-computer-use/scripts/mcp-server.sh",
+    "pi-computer-use": {
+      "command": "/Users/YOU/pi-computer-use/scripts/mcp-server.sh",
       "args": []
     }
   }
 }
 ```
 
-3. Copy the skill: `cp -R ~/open-computer-use/skills/open-computer-use ~/.cursor/skills/`
+3. Copy the skill: `cp -R ~/pi-computer-use/skills/pi-computer-use ~/.cursor/skills/`
 
 ## Permissions (all clients)
 
@@ -131,7 +131,7 @@ See [docs/permissions.md](../docs/permissions.md).
 ## Verify
 
 ```bash
-ocu --version
+pi-computer-use --version
 ./scripts/smoke-test.sh
 ```
 

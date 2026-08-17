@@ -37,15 +37,15 @@ jobs:
           swift build -c release --arch arm64 --arch x86_64
           BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
           mkdir -p dist
-          cp "$BIN_PATH/ocu" dist/ocu
-          file dist/ocu
+          cp "$BIN_PATH/pi-computer-use" dist/pi-computer-use
+          file dist/pi-computer-use
 
       - name: Package tarball
         id: package
         run: |
-          NAME="ocu-${{ steps.tag.outputs.name }}-macos-universal"
+          NAME="pi-computer-use-${{ steps.tag.outputs.name }}-macos-universal"
           mkdir -p "dist/$NAME"
-          cp dist/ocu "dist/$NAME/ocu"
+          cp dist/pi-computer-use "dist/$NAME/pi-computer-use"
           cp LICENSE "dist/$NAME/LICENSE"
           cp README.md "dist/$NAME/README.md"
           cp scripts/install.sh "dist/$NAME/install.sh"

@@ -1,24 +1,25 @@
-# OpenComputerUse
+# pi-computer-use
 
-<a href="README.ja.md">日本語</a>
+**macOS computer use for AI agents** — control the apps you already have open
+(logged-in Chrome, Slack, native apps) via the Accessibility API and synthetic
+input, exposed as an MCP stdio server and a small CLI.
 
-**macOS computer use for AI agents** — control the apps you already have open (logged-in Chrome, Slack, native apps) via the Accessibility API and synthetic input, exposed as an MCP stdio server and a small CLI.
+Forked from [nogu66/open-computer-use](https://github.com/nogu66/open-computer-use)
+(MIT License) and re-architected for the [Pi](https://pi.dev) coding agent.
 
-Inspired by [Codex Computer Use](https://developers.openai.com/codex/app/computer-use): same idea (OS-level AX + CGEvent, not CDP), packaged for Claude Code, Cursor, Codex, and any MCP client.
-
-| | Playwright / CDP | **open-computer-use (`ocu`)** |
+| | Playwright / CDP | **pi-computer-use** |
 |---|---|---|
 | Uses your logged-in Chrome profile | Usually no (separate profile) | **Yes** — operates the real app |
 | Cookie / SSO / extensions | Often lost | **Preserved** |
 | `navigator.webdriver` | May be set | **Not applicable** (not in the browser) |
 | Platform | Cross-platform | **macOS 13+ only** |
 
-## Install (recommended)
+## Install
 
-Install the latest **release binary** to `~/.local/bin/ocu`:
+Install the latest **release binary** to `~/.local/bin/pi-computer-use`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nogu66/open-computer-use/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dhongz/pi-computer-use/main/scripts/install.sh | bash
 ```
 
 From a checkout:
@@ -32,45 +33,27 @@ From a checkout:
 Ensure `~/.local/bin` is on your `PATH`, then wire MCP:
 
 ```bash
-claude mcp add open-computer-use -- $(which ocu)
+pi mcp add pi-computer-use -- "$(which pi-computer-use)"
 ```
 
-## Install as a plugin
+## Pi integration
 
-This repository also ships as a plugin for **Claude Code**, **Codex**, and **Cursor** (skill + MCP config). Install the binary first (above), then add the plugin so agents get the skill and MCP wiring.
+Add the MCP server to Pi's config (`~/.pi/agent/mcp.json`):
 
-### Claude Code
-
-```bash
-/plugin marketplace add nogu66/open-computer-use
-/plugin install open-computer-use@open-computer-use
-/reload-plugins
+```json
+{
+  "mcpServers": {
+    "pi-computer-use": {
+      "command": "/Users/<you>/.local/bin/pi-computer-use",
+      "args": []
+    }
+  }
+}
 ```
 
-The plugin bundles the `open-computer-use` skill and an MCP server (`open-computer-use`).
-
-### Codex
-
-```bash
-codex plugin marketplace add nogu66/open-computer-use
-# then install open-computer-use from the plugin directory in Codex
-```
-
-Repo-scoped marketplace file: [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json).  
-Codex-native manifest: [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json).
-
-### Cursor
-
-Clone or open this repo in Cursor. Project-level config is included:
-
-- MCP: [`.cursor/mcp.json`](.cursor/mcp.json) → `scripts/mcp-server.sh`
-- Skill: [`.cursor/skills/open-computer-use/SKILL.md`](.cursor/skills/open-computer-use/SKILL.md)
-
-Restart Cursor or reload MCP. On first connect, `mcp-server.sh` can auto-install the latest release if `ocu` is missing.
-
-For other projects, copy the skill to `~/.cursor/skills/open-computer-use/` and point MCP at `scripts/mcp-server.sh` from your checkout, or at `$(which ocu)` after `./scripts/install.sh`.
-
-See [examples/plugin-install.md](examples/plugin-install.md) for details and troubleshooting.
+See [`integrations/pi/mcp.json`](integrations/pi/mcp.json) for a ready-to-use
+example, and [`skills/pi-computer-use/SKILL.md`](skills/pi-computer-use/SKILL.md)
+for the agent skill.
 
 ## Quick start (manual build)
 
@@ -78,36 +61,25 @@ See [examples/plugin-install.md](examples/plugin-install.md) for details and tro
 
 - macOS 13 (Ventura) or later
 - Swift 5.9+ (Xcode 15+) only if building from source
-- **Accessibility** permission for the process that launches `ocu` (Terminal, Ghostty, Claude Code, Cursor, …)
+- **Accessibility** permission for the process that launches `pi-computer-use`
+  (Terminal, Ghostty, Pi, …)
 
 ### Build from source
 
 ```bash
-git clone https://github.com/nogu66/open-computer-use.git
-cd open-computer-use
-./scripts/install.sh --from-source
-ocu --version
+git clone https://github.com/dhongz/pi-computer-use.git
+cd pi-computer-use
+swift build
+swift test
 ```
-
-### MCP setup (manual)
-
-```bash
-claude mcp add open-computer-use -- $(which ocu)
-# or, from a dev checkout (auto-installs latest release on first MCP start):
-claude mcp add open-computer-use -- ./scripts/mcp-server.sh
-```
-
-Restart Claude Code. You should see tools like `mcp__open-computer-use__list_apps`, `get_ax_tree`, `click_element`, etc.
-
-See [examples/](examples/) for Cursor, Codex, and raw `mcp.json` snippets.
 
 ### CLI smoke test
 
 ```bash
-ocu apps
-ocu activate --bundle-id com.google.Chrome
-ocu tree --bundle-id com.google.Chrome --depth 6
-ocu click --bundle-id com.google.Chrome --query "Search"
+pi-computer-use apps
+pi-computer-use activate --bundle-id com.google.Chrome
+pi-computer-use tree --bundle-id com.google.Chrome --depth 6
+pi-computer-use click --bundle-id com.google.Chrome --query "Search"
 ```
 
 Run the MCP protocol smoke test (no UI permissions required for `list_apps`):
@@ -123,7 +95,8 @@ Run the MCP protocol smoke test (no UI permissions required for `list_apps`):
 | **Accessibility** | AX tree, clicks, keys, menus | System Settings → Privacy & Security → Accessibility |
 | **Screen Recording** | `screenshot` (window capture via `screencapture`) | System Settings → Privacy & Security → Screen Recording |
 
-Grant access to the **parent app** that spawns `ocu` (e.g. Claude Code), not only the `ocu` binary. Details: [docs/permissions.md](docs/permissions.md).
+Grant access to the **parent app** that spawns `pi-computer-use` (e.g. Pi), not
+only the binary. Details: [docs/permissions.md](docs/permissions.md).
 
 ## MCP tools
 
@@ -156,10 +129,10 @@ Full schemas and agent tips: [docs/tools.md](docs/tools.md).
 ## Architecture
 
 ```
-Your agent (Claude / Codex / Cursor / …)
+Your agent (Pi / Claude / Codex / Cursor / …)
         │  MCP JSON-RPC over stdio
         ▼
-   ocu (Swift)
+   pi-computer-use (Swift)
    ├── AXUIElement     read UI tree, AXPress, menus
    ├── CGEvent         mouse, keyboard, scroll
    └── screencapture   screenshots
@@ -168,24 +141,29 @@ Your agent (Claude / Codex / Cursor / …)
 User's real apps (Chrome with login, etc.)
 ```
 
-More detail: [docs/architecture.md](docs/architecture.md).
+Source layout:
 
-## Development
-
-```bash
-swift build && swift test
+```
+Sources/
+  PiComputerUseCore/        # platform-free: Version, CLIArgs, JSONRPC
+  PiComputerUseMac/         # macOS-specific library
+    Accessibility.swift     # AX tree walk, find, refs, permissions
+    Input.swift              # CGEvent click/type/key/scroll
+    Screenshot.swift         # screencapture + window id
+    AppRegistry.swift        # list/activate apps
+    Tools.swift              # tool implementations + registry
+  pi-computer-use/          # executable: MCP loop + CLI dispatch
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+More detail: [docs/architecture.md](docs/architecture.md).
 
-## Releases
+## Attribution
 
-Tagged releases (`v*.*.*`) publish a universal macOS binary tarball via GitHub Actions. See [CHANGELOG.md](CHANGELOG.md).
+This project is a fork of
+[nogu66/open-computer-use](https://github.com/nogu66/open-computer-use),
+Copyright (c) 2026 Yuta Noguchi, used under the MIT License. See
+[LICENSE](LICENSE).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-## Related research
-
-This repo was extracted from browser-agent research comparing Accessibility-based control vs Chrome extension / Playwright approaches. The investigation notes live in the parent [browser-agent-research](https://github.com/nogu66/browser-agent-research) workspace (Japanese).

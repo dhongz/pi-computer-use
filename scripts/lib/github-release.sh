@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Shared GitHub Release helpers for install.sh and resolve-ocu.sh
+# Shared GitHub Release helpers for install.sh and resolve-pcu.sh
 set -euo pipefail
 
-ocu_default_repo() {
-  printf '%s\n' "${OCU_GITHUB_REPO:-nogu66/open-computer-use}"
+pcu_default_repo() {
+  printf '%s\n' "${PCU_GITHUB_REPO:-dhongz/pi-computer-use}"
 }
 
-ocu_normalize_tag() {
+pcu_normalize_tag() {
   local version="$1"
   if [[ "$version" == "latest" ]]; then
     printf '%s\n' "latest"
@@ -19,12 +19,12 @@ ocu_normalize_tag() {
   fi
 }
 
-ocu_resolve_release_tag() {
-  local repo="${1:-$(ocu_default_repo)}"
+pcu_resolve_release_tag() {
+  local repo="${1:-$(pcu_default_repo)}"
   local version="${2:-latest}"
   local tag
 
-  tag="$(ocu_normalize_tag "$version")"
+  tag="$(pcu_normalize_tag "$version")"
   if [[ "$tag" == "latest" ]]; then
     curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" \
       | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])"
@@ -34,38 +34,38 @@ ocu_resolve_release_tag() {
   printf '%s\n' "$tag"
 }
 
-ocu_release_tarball_name() {
+pcu_release_tarball_name() {
   local tag="$1"
-  printf 'ocu-%s-macos-universal.tar.gz\n' "$tag"
+  printf 'pi-computer-use-%s-macos-universal.tar.gz\n' "$tag"
 }
 
-ocu_release_download_url() {
-  local repo="${1:-$(ocu_default_repo)}"
+pcu_release_download_url() {
+  local repo="${1:-$(pcu_default_repo)}"
   local tag="$2"
   local tarball
-  tarball="$(ocu_release_tarball_name "$tag")"
+  tarball="$(pcu_release_tarball_name "$tag")"
   printf 'https://github.com/%s/releases/download/%s/%s\n' "$repo" "$tag" "$tarball"
 }
 
-ocu_install_from_release() {
-  local repo="${1:-$(ocu_default_repo)}"
+pcu_install_from_release() {
+  local repo="${1:-$(pcu_default_repo)}"
   local version="${2:-latest}"
   local dest="${3:-$HOME/.local/bin}"
-  local bin="$dest/ocu"
+  local bin="$dest/pi-computer-use"
   local tag tarball url tmpdir extract_dir
 
-  tag="$(ocu_resolve_release_tag "$repo" "$version")"
-  tarball="$(ocu_release_tarball_name "$tag")"
-  url="$(ocu_release_download_url "$repo" "$tag")"
+  tag="$(pcu_resolve_release_tag "$repo" "$version")"
+  tarball="$(pcu_release_tarball_name "$tag")"
+  url="$(pcu_release_download_url "$repo" "$tag")"
   tmpdir="$(mktemp -d)"
-  extract_dir="$tmpdir/ocu-${tag}-macos-universal"
+  extract_dir="$tmpdir/pi-computer-use-${tag}-macos-universal"
 
   cleanup() {
     rm -rf "$tmpdir"
   }
   trap cleanup EXIT
 
-  if [[ "${OCU_QUIET:-}" != "1" ]]; then
+  if [[ "${PCU_QUIET:-}" != "1" ]]; then
     echo "==> Downloading ${tag} (${url})" >&2
   fi
 
@@ -85,18 +85,18 @@ ocu_install_from_release() {
 
   tar -xzf "$tmpdir/$tarball" -C "$tmpdir"
   mkdir -p "$dest"
-  cp "$extract_dir/ocu" "$bin"
+  cp "$extract_dir/pi-computer-use" "$bin"
   chmod +x "$bin"
   printf '%s\n' "$bin"
 }
 
-ocu_install_from_source() {
+pcu_install_from_source() {
   local root="${1:?repo root required}"
   local dest="${2:-$HOME/.local/bin}"
-  local bin="$dest/ocu"
+  local bin="$dest/pi-computer-use"
 
-  if [[ "${OCU_QUIET:-}" != "1" ]]; then
-    echo "==> Building open-computer-use from source in ${root}" >&2
+  if [[ "${PCU_QUIET:-}" != "1" ]]; then
+    echo "==> Building pi-computer-use from source in ${root}" >&2
   fi
 
   if ! command -v swift >/dev/null 2>&1; then
@@ -109,7 +109,7 @@ ocu_install_from_source() {
     swift build -c release >&2
   )
   mkdir -p "$dest"
-  cp "$root/.build/release/ocu" "$bin"
+  cp "$root/.build/release/pi-computer-use" "$bin"
   chmod +x "$bin"
   printf '%s\n' "$bin"
 }
