@@ -80,10 +80,11 @@ to Accessibility for some macOS versions.
 
 ## Browser-level Chrome backend
 
-The optional `pi-chrome` MCP server handles browser pages separately from the
-Swift desktop backend. It launches a small Node MCP process and connects to the
-locally installed **Pi Chrome Bridge** MV3 extension over an authenticated
-WebSocket bound to `127.0.0.1`.
+The optional `pi-chrome` MCP server and Pi extension handle browser pages
+separately from the Swift desktop backend. A shared Node daemon owns the single
+browser-extension WebSocket; MCP/Pi clients connect to its authenticated
+loopback control socket. This lets multiple Pi sessions share one Chrome
+profile without competing for the browser port.
 
 The extension uses `chrome.tabs`, `chrome.scripting`, and `chrome.debugger` to:
 
@@ -98,6 +99,12 @@ This gives Pi a browser-level surface similar to Codex's Chrome connector while
 keeping the implementation independent of Codex's proprietary turn metadata.
 The browser bridge is installed with `scripts/install-chrome.sh`; see
 [`docs/chrome-browser.md`](chrome-browser.md).
+
+A Pi package adapter is also available in `extensions/pi-chrome.js`. In Pi
+extension mode it registers direct `pi_chrome_*` tools and owns the bridge for
+the session lifecycle. The standalone `pi-chrome` MCP server remains available for other MCP clients;
+all clients should use the shared daemon rather than binding the browser port
+independently.
 
 The native backend remains important. It handles Finder, Slack desktop, native
 settings, canvas-like regions, and browser UI that is not exposed through the
@@ -116,7 +123,8 @@ Trade-offs:
 
 - the browser extension has broad page permissions and must be loaded only in a
   profile the user trusts Pi to access;
-- the current bridge supports one fixed loopback port per Chrome profile;
+- the shared daemon uses one browser/control port pair per Chrome profile;
+  multiple Pi sessions share it;
 - DOM actions do not replace native Accessibility for opaque canvas content;
 - the native backend remains macOS-only; no Linux/Windows support is planned.
 

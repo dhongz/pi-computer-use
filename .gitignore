@@ -52,5 +52,6 @@ Icon?
 *.local
 
 # Pi Chrome bridge dependencies and generated extension credentials
+node_modules/
 browser/node_modules/
 browser/extension/bridge-config.js
