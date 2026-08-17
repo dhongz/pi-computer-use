@@ -22,8 +22,10 @@ func axAttr(_ e: AXUIElement, _ n: String) -> AnyObject? {
 }
 
 func axRole(_ e: AXUIElement) -> String {
-    return (axAttr(e, kAXRoleDescriptionAttribute as String) as? String)
-        ?? (axAttr(e, kAXRoleAttribute as String) as? String) ?? "?"
+    // Use the stable AX role in structured responses. The localized role
+    // description is still available to substring matching through matches().
+    return (axAttr(e, kAXRoleAttribute as String) as? String)
+        ?? (axAttr(e, kAXRoleDescriptionAttribute as String) as? String) ?? "?"
 }
 
 func axString(_ e: AXUIElement, _ k: String) -> String? {
@@ -36,8 +38,17 @@ func enableEnhanced(_ axApp: AXUIElement) {
     AXUIElementSetAttributeValue(axApp, "AXManualAccessibility" as CFString, kCFBooleanTrue!)
 }
 
-public func findApp(_ bundleId: String) -> NSRunningApplication? {
-    return NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleId }
+/// Resolve by bundle ID, display name, or application path. Bundle IDs are
+/// preferred; name/path matching is case-insensitive and only regular apps
+/// are considered.
+public func findApp(_ identifier: String) -> NSRunningApplication? {
+    let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
+    if let exact = apps.first(where: { $0.bundleIdentifier == identifier }) { return exact }
+    let normalized = identifier.lowercased()
+    return apps.first {
+        ($0.localizedName ?? "").lowercased() == normalized ||
+        ($0.bundleURL?.path.lowercased() == normalized)
+    }
 }
 
 func focusedWindow(of axApp: AXUIElement) -> AXUIElement {
@@ -72,12 +83,20 @@ func short(_ s: String) -> String {
 /// In-process map of `@eN` refs → AX elements. Populated by tree dumps,
 /// invalidated on the next dump for the same process.
 var refMap: [Int: AXUIElement] = [:]
+var registerSessionRefs = true
+var treePartial = false
 
 func walkText(_ e: AXUIElement, maxDepth: Int, depth: Int = 0, counter: inout Int, out: inout String) {
     counter += 1
     refMap[counter] = e
+    if registerSessionRefs, let bundleID = computerUseSession.activeBundleID {
+        _ = computerUseSession.register(e, appBundleID: bundleID, windowID: computerUseSession.activeWindowID)
+    }
     out += String(repeating: "  ", count: depth) + "@e\(counter) \(describe(e))\n"
-    if depth >= maxDepth { return }
+    if depth >= maxDepth {
+        treePartial = true
+        return
+    }
     if let cs = axAttr(e, kAXChildrenAttribute as String) as? [AXUIElement] {
         for c in cs { walkText(c, maxDepth: maxDepth, depth: depth + 1, counter: &counter, out: &out) }
     }
@@ -87,8 +106,14 @@ func walkJson(_ e: AXUIElement, maxDepth: Int, depth: Int = 0, counter: inout In
     counter += 1
     let myRef = counter
     refMap[myRef] = e
+    if registerSessionRefs, let bundleID = computerUseSession.activeBundleID {
+        _ = computerUseSession.register(e, appBundleID: bundleID, windowID: computerUseSession.activeWindowID)
+    }
     var node: [String: Any] = [
-        "ref": myRef,
+        "kind": "ref",
+        "ref": "e\(myRef)",
+        "legacyRef": myRef,
+        "refsVersion": computerUseSession.refsVersion,
         "role": axRole(e)
     ]
     if let s = axString(e, kAXTitleAttribute as String) { node["title"] = s }
@@ -113,7 +138,7 @@ func walkJson(_ e: AXUIElement, maxDepth: Int, depth: Int = 0, counter: inout In
 func matches(_ e: AXUIElement, _ q: String) -> Bool {
     for k in [kAXDescriptionAttribute, kAXTitleAttribute, kAXValueAttribute, kAXHelpAttribute,
               kAXRoleDescriptionAttribute, kAXRoleAttribute, kAXIdentifierAttribute] {
-        if let s = axAttr(e, k as String) as? String, s.contains(q) { return true }
+        if let s = axAttr(e, k as String) as? String, s.localizedCaseInsensitiveContains(q) { return true }
     }
     return false
 }
@@ -128,12 +153,8 @@ func find(_ e: AXUIElement, _ q: String, depth: Int = 0) -> AXUIElement? {
 }
 
 func elementCenter(_ e: AXUIElement) -> CGPoint? {
-    guard let pos = axAttr(e, kAXPositionAttribute as String),
-          let size = axAttr(e, kAXSizeAttribute as String) else { return nil }
-    var p = CGPoint.zero, s = CGSize.zero
-    AXValueGetValue(pos as! AXValue, .cgPoint, &p)
-    AXValueGetValue(size as! AXValue, .cgSize, &s)
-    return CGPoint(x: p.x + s.width / 2, y: p.y + s.height / 2)
+    guard let bounds = axBounds(e) else { return nil }
+    return CGPoint(x: bounds.midX, y: bounds.midY)
 }
 
 // MARK: - Permissions

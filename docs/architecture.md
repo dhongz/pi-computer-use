@@ -78,18 +78,47 @@ the tool resolves the app's main window via `CGWindowListCopyWindowInfo` and
 captures that window. This requires **Screen Recording** permission in addition
 to Accessibility for some macOS versions.
 
-## Why not CDP / Playwright?
+## Browser-level Chrome backend
 
-CDP attaches to a browser process and sees the DOM. `pi-computer-use` never enters the
-browser — it sees the same AX tree as VoiceOver and sends the same events a
-human would. That is why a normal, logged-in Chrome session works without
-exporting cookies or launching a second profile.
+The optional `pi-chrome` MCP server handles browser pages separately from the
+Swift desktop backend. It launches a small Node MCP process and connects to the
+locally installed **Pi Chrome Bridge** MV3 extension over an authenticated
+WebSocket bound to `127.0.0.1`.
+
+The extension uses `chrome.tabs`, `chrome.scripting`, and `chrome.debugger` to:
+
+- list and create tabs in the user's existing Chrome profile;
+- require explicit claims before mutating existing tabs;
+- capture visible DOM snapshots with versioned node ids;
+- perform DOM clicks and form fills without moving the macOS pointer;
+- send browser-scoped keyboard events and capture background screenshots; and
+- wait for page text or selectors after asynchronous navigation.
+
+This gives Pi a browser-level surface similar to Codex's Chrome connector while
+keeping the implementation independent of Codex's proprietary turn metadata.
+The browser bridge is installed with `scripts/install-chrome.sh`; see
+[`docs/chrome-browser.md`](chrome-browser.md).
+
+The native backend remains important. It handles Finder, Slack desktop, native
+settings, canvas-like regions, and browser UI that is not exposed through the
+DOM. It uses the Accessibility tree first and CGEvent only as a documented
+foreground fallback.
+
+## Why not CDP / Playwright in the native backend?
+
+CDP attaches to a browser process and sees the DOM. The Swift
+`pi-computer-use` backend intentionally remains a macOS desktop backend rather
+than embedding a browser runtime. The separate `pi-chrome` bridge owns the DOM
+workflow so a normal, logged-in Chrome profile can be controlled without sending
+CGEvents to the whole desktop.
 
 Trade-offs:
 
-- Slower and noisier than DOM selectors for web-only tasks
-- Substring search can match the wrong element when labels repeat
-- macOS-only; no Linux/Windows support planned
+- the browser extension has broad page permissions and must be loaded only in a
+  profile the user trusts Pi to access;
+- the current bridge supports one fixed loopback port per Chrome profile;
+- DOM actions do not replace native Accessibility for opaque canvas content;
+- the native backend remains macOS-only; no Linux/Windows support is planned.
 
 ## CI vs local dev
 

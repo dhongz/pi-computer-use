@@ -48,14 +48,18 @@ func cliPrintHelp() {
     SUBCOMMANDS:
       apps                                   List running GUI apps (name, bundle_id, pid)
       activate --bundle-id <id>              Bring app to foreground (call this first!)
+      state  --bundle-id <id> [--screenshot] [--ocr]
+                                             Return coherent structured app state
       tree   --bundle-id <id> [--depth N] [--scope window|app]
                                              Dump numbered AX tree (text or --json)
-      find   --bundle-id <id> --query <q>    Locate first AX element matching query
+      find   --bundle-id <id> --query <q>    Locate unique AX element matching query
       wait   --bundle-id <id> --query <q> [--timeout SEC]
                                              Poll until element appears (default 10s)
-      click  --bundle-id <id> --query <q>    Left-click first element matching query
-      rclick --bundle-id <id> --query <q>    Right-click first element matching query
-      type   --text <s>                      Type text into focused field
+      click  --bundle-id <id> --query <q>    Click unique AX/OCR target
+      rclick --bundle-id <id> --query <q>    Right-click unique element
+      set-value --bundle-id <id> --query <q> --value <s>
+      select-text --bundle-id <id> --query <q> --text <s>
+      type   --bundle-id <id> --text <s>     Type text into verified focused field
       key    --key <name> [--mods cmd,shift,alt,ctrl]
                                              Send a single key (optionally with modifiers)
       scroll [--bundle-id <id> --query <q>] [--dx N] [--dy N]
@@ -63,6 +67,8 @@ func cliPrintHelp() {
       menu   --bundle-id <id> --path <p>     Press menubar item by path (e.g. 'File/Open')
       shot   [--bundle-id <id>] [--out <path>]
                                              Capture screenshot (default: /tmp/...png)
+      ocr    [--bundle-id <id>] [--provider vision|http]
+                                             Run local Vision OCR (http is unconfigured)
       clip get                               Read clipboard text
       clip set --text <s>                    Write clipboard text
 
@@ -92,6 +98,7 @@ func cliEmit(_ result: [String: Any], json: Bool) -> Never {
         var out: [String: Any] = ["ok": !isError]
         out["text"] = cliExtractText(result)
         if isError { out["error"] = cliExtractText(result) }
+        if let structured = result["structuredContent"] { out["structuredContent"] = structured }
         if let data = try? JSONSerialization.data(withJSONObject: out, options: [.sortedKeys]),
            let s = String(data: data, encoding: .utf8) {
             print(s)
@@ -121,6 +128,8 @@ func cliMain(_ argv: [String]) -> Never {
     var toolArgs: [String: Any] = [:]
     if let v = opts["bundle-id"] { toolArgs["bundle_id"] = v }
     if let v = opts["query"]     { toolArgs["query"] = v }
+    if let v = opts["provider"]  { toolArgs["provider"] = v }
+    if let v = opts["selection-type"] { toolArgs["selection_type"] = v }
     if let v = opts["text"]      { toolArgs["text"] = v }
     if let v = opts["key"]       { toolArgs["key"] = v }
     if let v = opts["scope"]     { toolArgs["scope"] = v }
@@ -141,22 +150,34 @@ func cliMain(_ argv: [String]) -> Never {
         cliEmit(t_activate(toolArgs), json: json)
     case "tree":
         if json {
-            cliEmit(t_axTreeJson(toolArgs), json: false) // already JSON in body
+            cliEmit(t_axTreeJson(toolArgs), json: true) // preserve structured JSON in CLI output
         } else {
             cliEmit(t_axTree(toolArgs), json: false)
         }
+    case "state":
+        toolArgs["screenshot"] = flags.contains("screenshot")
+        toolArgs["ocr"] = flags.contains("ocr")
+        cliEmit(t_getAppState(toolArgs), json: json)
+    case "ocr":
+        cliEmit(t_ocr(toolArgs), json: json)
     case "find":
         cliEmit(t_findElement(toolArgs), json: json)
     case "wait":
         cliEmit(t_wait(toolArgs), json: json)
     case "click":
         cliEmit(t_clickElement(toolArgs), json: json)
+    case "set-value":
+        cliEmit(t_setValue(toolArgs), json: json)
+    case "select-text":
+        cliEmit(t_selectText(toolArgs), json: json)
     case "rclick":
         cliEmit(t_rightClick(toolArgs), json: json)
     case "type":
         cliEmit(t_typeText(toolArgs), json: json)
     case "key":
         cliEmit(t_keyPress(toolArgs), json: json)
+    case "drag":
+        cliEmit(t_drag(toolArgs), json: json)
     case "scroll":
         cliEmit(t_scroll(toolArgs), json: json)
     case "menu":
@@ -234,7 +255,23 @@ while let line = readLine() {
     case "initialize":
         respond(id, result: [
             "protocolVersion": "2024-11-05",
-            "capabilities": ["tools": [String: Any]()],
+            "capabilities": [
+                "tools": [String: Any](),
+                "computerUse": [
+                    "contractVersion": "0.2",
+                    "backend": "macos-ax-cgevent",
+                    "accessibilityTree": true,
+                    "structuredTree": true,
+                    "screenshots": true,
+                    "setValue": true,
+                    "selectText": true,
+                    "secondaryActions": true,
+                    "ocr": true,
+                    "ocrProviders": ["vision", "http"],
+                    "defaultOCRProvider": "vision",
+                    "remoteOcr": false
+                ]
+            ],
             "serverInfo": [
                 "name": PiComputerUse.serverName,
                 "version": PiComputerUse.version
@@ -247,7 +284,15 @@ while let line = readLine() {
     case "tools/call":
         let name = params["name"] as? String ?? ""
         let args = params["arguments"] as? [String: Any] ?? [:]
-        respond(id, result: handleTool(name, args))
+        let started = Date()
+        let toolResponse = handleTool(name, args)
+        // Structured responses carry the public request ID. Log only the ID,
+        // tool name, and timing; never clipboard/OCR/screenshot contents.
+        let structured = toolResponse["structuredContent"] as? [String: Any]
+        let requestID = structured?["requestId"] as? String ?? "unknown"
+        let durationMs = Int(Date().timeIntervalSince(started) * 1000)
+        pcuLog("requestId=\(requestID) tool=\(name) durationMs=\(durationMs)")
+        respond(id, result: toolResponse)
     case "ping":
         respond(id, result: [String: Any]())
     default:

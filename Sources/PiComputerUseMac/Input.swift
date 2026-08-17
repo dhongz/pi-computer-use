@@ -22,6 +22,19 @@ func sendRightClick(_ pt: CGPoint) {
     CGEvent(mouseEventSource: evtSrc, mouseType: .rightMouseUp, mouseCursorPosition: pt, mouseButton: .right)?.post(tap: .cghidEventTap)
 }
 
+func sendDrag(from: CGPoint, to: CGPoint) {
+    CGEvent(mouseEventSource: evtSrc, mouseType: .mouseMoved, mouseCursorPosition: from, mouseButton: .left)?.post(tap: .cghidEventTap)
+    CGEvent(mouseEventSource: evtSrc, mouseType: .leftMouseDown, mouseCursorPosition: from, mouseButton: .left)?.post(tap: .cghidEventTap)
+    let steps = 12
+    for step in 1...steps {
+        let progress = CGFloat(step) / CGFloat(steps)
+        let point = CGPoint(x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress)
+        CGEvent(mouseEventSource: evtSrc, mouseType: .leftMouseDragged, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.01)
+    }
+    CGEvent(mouseEventSource: evtSrc, mouseType: .leftMouseUp, mouseCursorPosition: to, mouseButton: .left)?.post(tap: .cghidEventTap)
+}
+
 func sendScroll(dx: Int32, dy: Int32, at: CGPoint? = nil) {
     if let pt = at {
         CGEvent(mouseEventSource: evtSrc, mouseType: .mouseMoved, mouseCursorPosition: pt, mouseButton: .left)?.post(tap: .cghidEventTap)
