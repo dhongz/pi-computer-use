@@ -1,4 +1,5 @@
-import { ChromeBridge, callTool, tools as chromeTools } from "../browser/server.mjs";
+import { ChromeDaemonClient } from "../browser/client.mjs";
+import { callTool, tools as chromeTools } from "../browser/server.mjs";
 
 const DEFAULT_PORT = 37842;
 const DEFAULT_TOKEN_FILE = `${process.env.HOME ?? "~"}/.pi/agent/chrome-bridge-token`;
@@ -8,16 +9,17 @@ let bridgeStart = null;
 
 function bridgeOptions() {
   return {
-    port: Number(process.env.PI_CHROME_PORT ?? DEFAULT_PORT),
+    browserPort: Number(process.env.PI_CHROME_PORT ?? DEFAULT_PORT),
+    controlPort: Number(process.env.PI_CHROME_CONTROL_PORT ?? DEFAULT_PORT + 1),
     tokenFile: process.env.PI_CHROME_TOKEN_FILE || DEFAULT_TOKEN_FILE,
   };
 }
 
 async function ensureBridge() {
-  if (bridge?.wss) return bridge;
+  if (bridge?.socket?.readyState === 1) return bridge;
   if (!bridgeStart) {
     bridgeStart = (async () => {
-      const next = await new ChromeBridge(bridgeOptions()).start();
+      const next = await ChromeDaemonClient.connect(bridgeOptions());
       bridge = next;
       return next;
     })().catch(error => {
@@ -32,7 +34,7 @@ async function stopBridge() {
   const current = bridge;
   bridge = null;
   bridgeStart = null;
-  if (current) await current.stop();
+  if (current) await current.close();
 }
 
 function piToolName(originalName) {
@@ -94,7 +96,8 @@ export default function piChromeExtension(pi) {
     try {
       const current = await ensureBridge();
       await current.waitForExtension(10_000);
-      if (ctx.hasUI) ctx.ui.setStatus("pi-chrome", current.isExtensionConnected() ? "Chrome connected" : "Chrome bridge listening");
+      const status = await current.command("status");
+      if (ctx.hasUI) ctx.ui.setStatus("pi-chrome", status.connected ? "Chrome connected" : "Chrome bridge listening");
     } catch (error) {
       if (ctx.hasUI) ctx.ui.notify(`Pi Chrome bridge unavailable: ${error?.message ?? String(error)}`, "warning");
     }

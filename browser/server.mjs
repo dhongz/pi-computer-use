@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import readline from "node:readline";
 import { WebSocket, WebSocketServer } from "ws";
+import { ChromeDaemonClient } from "./client.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_PORT = 37842;
@@ -426,7 +427,7 @@ function allowedBrowserUrl(value) {
 export async function callTool(bridge, name, args) {
   const canonicalName = name.startsWith("chrome_") ? name.slice("chrome_".length) : name;
   if (canonicalName === "status") {
-    return mcpSuccess(name, statusPayload(bridge));
+    return mcpSuccess(name, await bridge.command("status"));
   }
   switch (canonicalName) {
     case "list_tabs":
@@ -482,7 +483,7 @@ function targetFromArgs(args = {}) {
 }
 
 export async function startServer(options = {}) {
-  const bridge = await new ChromeBridge(options).start();
+  const bridge = await ChromeDaemonClient.connect(options);
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   let closed = false;
 
@@ -542,11 +543,11 @@ export async function startServer(options = {}) {
     if (closed) return;
     closed = true;
     rl.close();
-    await bridge.stop();
+    await bridge.close();
   };
   process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
   process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
-  process.once("exit", () => bridge.rejectPending(new BridgeError("BRIDGE_STOPPED", "Pi Chrome bridge stopped")));
+  process.once("exit", () => bridge.close());
   return bridge;
 }
 

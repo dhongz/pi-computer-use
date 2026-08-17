@@ -11,11 +11,11 @@ Pi Computer Use has two browser surfaces:
 The Chrome bridge is deliberately separate from the Swift desktop backend:
 
 ```text
-Pi MCP client
-    │ stdio JSON-RPC
+Pi MCP/Pi adapter clients
+    │ authenticated control WebSocket on 127.0.0.1
     ▼
-pi-chrome MCP server (Node)
-    │ authenticated WebSocket on 127.0.0.1
+shared pi-chrome daemon (one per Chrome profile)
+    │ authenticated browser WebSocket on 127.0.0.1
     ▼
 Pi Chrome Bridge extension (MV3)
     │ chrome.tabs / chrome.scripting / chrome.debugger
@@ -57,9 +57,10 @@ installation, install the repository as a Pi package instead:
 ./scripts/install-pi-extension.sh
 ```
 
-This registers direct `pi_chrome_*` tools, starts the bridge with Pi's session
-lifecycle, adds `/chrome-status`, and disables the standalone `pi-chrome` MCP
-entry in Pi's local config to avoid two processes competing for the same port.
+This registers direct `pi_chrome_*` tools, connects to the shared daemon from
+Pi's session lifecycle, adds `/chrome-status`, and disables the standalone
+`pi-chrome` MCP entry in Pi's local config to avoid duplicate Pi-side tools. The
+daemon remains shared across Pi sessions and owns the browser port.
 The Chrome MV3 extension is still required. Run `/reload` after installation.
 
 Use `--open-extensions` if you want the installer to open the extensions page:
@@ -68,8 +69,10 @@ Use `--open-extensions` if you want the installer to open the extensions page:
 ./scripts/install-chrome.sh --open-extensions
 ```
 
-The bridge binds only to `127.0.0.1`. The WebSocket handshake requires the
-random token, and the token is never printed by the installer or MCP server.
+The daemon binds both control and browser sockets only to `127.0.0.1`. The
+WebSocket handshakes require the random token, and the token is never printed by
+the installer or MCP server. Multiple Pi sessions connect to the same daemon;
+they do not each bind the browser port.
 
 ## Browser workflow
 
@@ -134,9 +137,9 @@ submit, upload, delete, purchase, or disclose sensitive information.
 - Chrome internal pages such as `chrome://extensions` are not scriptable.
 - The extension must be loaded once manually because Chrome protects unpacked
   extension installation behind Developer mode.
-- The current bridge uses one fixed loopback port per user profile. Run one
-  `pi-chrome` bridge at a time, or set a different `PI_CHROME_PORT` and reinstall
-  the extension for another profile/session.
+- The current daemon uses one browser/control port pair per Chrome profile.
+  Multiple Pi sessions share it. Use a different `PI_CHROME_PORT` and
+  `PI_CHROME_CONTROL_PORT` pair for a second Chrome profile.
 - The bridge is intentionally not a replacement for the native macOS backend.
   Use `pi-computer-use_*` for Finder, Slack desktop, native settings, and other
   non-browser applications.

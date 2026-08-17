@@ -41,4 +41,4 @@ if (!process.env.PI_SKIP_PACKAGE_INSTALL) {
 const disabled = await disablePiChromeMcp();
 console.log("Pi Chrome extension adapter installed.");
 console.log("Restart Pi or run /reload so the direct pi_chrome_* tools are registered.");
-if (disabled) console.log("Disabled the standalone pi-chrome MCP server in Pi config to avoid a duplicate bridge.");
+if (disabled) console.log("Disabled the standalone pi-chrome MCP tools in Pi config; all Pi sessions now share the daemon.");

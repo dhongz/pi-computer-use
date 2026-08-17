@@ -14,25 +14,28 @@ const defaultExtensionDir = path.join(defaultAgentDir, "chrome-extension");
 const defaultTokenFile = path.join(defaultAgentDir, "chrome-bridge-token");
 const defaultMcpConfig = path.join(defaultAgentDir, "mcp.json");
 const defaultPort = 37842;
+const defaultControlPort = 37843;
 
 function parseArgs(argv) {
-  const options = { configurePi: true, openExtensions: false, port: defaultPort };
+  const options = { configurePi: true, openExtensions: false, port: defaultPort, controlPort: defaultControlPort };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--no-configure-pi") options.configurePi = false;
     else if (arg === "--open-extensions") options.openExtensions = true;
     else if (arg === "--port") options.port = Number(argv[++i]);
+    else if (arg === "--control-port") options.controlPort = Number(argv[++i]);
     else if (arg === "--extension-dir") options.extensionDir = path.resolve(argv[++i]);
     else if (arg === "--token-file") options.tokenFile = path.resolve(argv[++i]);
     else if (arg === "--mcp-config") options.mcpConfig = path.resolve(argv[++i]);
     else if (arg === "--help" || arg === "-h") {
-      console.log(`Install Pi Chrome Bridge.\n\nOptions:\n  --no-configure-pi       Do not update ~/.pi/agent/mcp.json\n  --open-extensions        Open chrome://extensions after staging\n  --port <n>               Local bridge port (default ${defaultPort})\n  --extension-dir <path>   Extension install directory\n  --token-file <path>      Bridge token file\n  --mcp-config <path>      Pi MCP config path\n`);
+      console.log(`Install Pi Chrome Bridge.\n\nOptions:\n  --no-configure-pi       Do not update ~/.pi/agent/mcp.json\n  --open-extensions        Open chrome://extensions after staging\n  --port <n>               Local browser-extension port (default ${defaultPort})\n  --control-port <n>       Local Pi-session control port (default ${defaultControlPort})\n  --extension-dir <path>   Extension install directory\n  --token-file <path>      Bridge token file\n  --mcp-config <path>      Pi MCP config path\n`);
       process.exit(0);
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
   }
   if (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535) throw new Error("--port must be an integer between 1024 and 65535");
+  if (!Number.isInteger(options.controlPort) || options.controlPort < 1024 || options.controlPort > 65535) throw new Error("--control-port must be an integer between 1024 and 65535");
   options.extensionDir ??= defaultExtensionDir;
   options.tokenFile ??= defaultTokenFile;
   options.mcpConfig ??= defaultMcpConfig;
@@ -94,8 +97,10 @@ async function configurePi(mcpConfig, command, options) {
     env: {
       ...(previous.env ?? {}),
       PI_CHROME_PORT: String(options.port),
+      PI_CHROME_CONTROL_PORT: String(options.controlPort),
       PI_CHROME_TOKEN_FILE: options.tokenFile,
     },
+    disabled: false,
     lifecycle: "lazy-keep-alive",
     directTools: true,
   };
