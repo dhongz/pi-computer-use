@@ -52,7 +52,7 @@ Add the MCP server to Pi's config (`~/.pi/agent/mcp.json`):
 ```
 
 See [`integrations/pi/mcp.json`](integrations/pi/mcp.json) for a ready-to-use
-example, and [`skills/pi-computer-use/SKILL.md`](skills/pi-computer-use/SKILL.md)
+example, and [`skills/computer-use/SKILL.md`](skills/computer-use/SKILL.md)
 for the agent skill.
 
 ## Quick start (manual build)

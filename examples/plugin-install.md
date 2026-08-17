@@ -3,7 +3,7 @@
 Install **pi-computer-use** as a plugin for Claude Code, Codex, or Cursor. Each path bundles:
 
 - MCP server (`scripts/mcp-server.sh` → `pi-computer-use` stdio)
-- Agent skill (`skills/pi-computer-use/SKILL.md`)
+- Agent skill (`skills/computer-use/SKILL.md`)
 
 ## 1. Install the binary (do this first)
 
@@ -86,7 +86,7 @@ Repo marketplace (Codex): [`.agents/plugins/marketplace.json`](../.agents/plugin
 Project files are already wired:
 
 - [`.cursor/mcp.json`](../.cursor/mcp.json)
-- [`.cursor/skills/pi-computer-use/SKILL.md`](../.cursor/skills/pi-computer-use/SKILL.md)
+- [`skills/computer-use/SKILL.md`](../skills/computer-use/SKILL.md)
 
 Restart Cursor or reload MCP.
 
@@ -119,7 +119,7 @@ Or keep the wrapper for auto-install on first connect:
 }
 ```
 
-3. Copy the skill: `cp -R ~/pi-computer-use/skills/pi-computer-use ~/.cursor/skills/`
+3. Copy the skill: `cp -R ~/pi-computer-use/skills/computer-use ~/.cursor/skills/`
 
 ## Permissions (all clients)
 

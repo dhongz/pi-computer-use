@@ -1,18 +1,18 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "open-computer-use",
+  "name": "pi-computer-use",
   "description": "macOS computer use plugin — MCP server and agent skill for controlling real logged-in apps",
   "owner": {
-    "name": "nogu66"
+    "name": "dhongz"
   },
   "plugins": [
     {
-      "name": "open-computer-use",
+      "name": "pi-computer-use",
       "source": "./",
-      "description": "Control logged-in Chrome, Slack, and native macOS apps from Claude Code, Codex, or Cursor",
+      "description": "Control logged-in Chrome, Slack, and native macOS apps from Claude Code, Codex, Cursor, or Pi",
       "version": "0.1.0",
       "author": {
-        "name": "nogu66"
+        "name": "dhongz"
       },
       "category": "development"
     }
