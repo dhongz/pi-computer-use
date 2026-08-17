@@ -1,0 +1,15 @@
+{
+  "name": "pi-computer-use",
+  "version": "0.2.0",
+  "description": "Pi skills and extensions for stateful macOS and Chrome computer use",
+  "private": true,
+  "type": "module",
+  "keywords": ["pi-package"],
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"]
+  }
+}

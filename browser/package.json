@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node test/protocol.test.mjs && node --check extension/background.js"
+    "test": "node test/protocol.test.mjs && node test/pi-extension.test.mjs && node --check extension/background.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
