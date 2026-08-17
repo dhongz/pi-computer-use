@@ -48,6 +48,20 @@ DOM snapshots, keyboard input, and background screenshots.
 Then reload Pi's MCP configuration or restart Pi. The `pi-chrome_status` tool
 should report `connected: true`.
 
+### Pi extension mode
+
+The standalone MCP server works with any MCP client. For a first-class Pi
+installation, install the repository as a Pi package instead:
+
+```bash
+./scripts/install-pi-extension.sh
+```
+
+This registers direct `pi_chrome_*` tools, starts the bridge with Pi's session
+lifecycle, adds `/chrome-status`, and disables the standalone `pi-chrome` MCP
+entry in Pi's local config to avoid two processes competing for the same port.
+The Chrome MV3 extension is still required. Run `/reload` after installation.
+
 Use `--open-extensions` if you want the installer to open the extensions page:
 
 ```bash

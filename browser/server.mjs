@@ -84,7 +84,7 @@ const targetProperties = {
   exact: { type: "boolean", description: "Require exact text/name matching" },
 };
 
-const tools = [
+export const tools = [
   {
     name: "status",
     description: "Show whether the Pi Chrome extension is connected and ready.",
@@ -181,10 +181,10 @@ function statusPayload({ port, tokenFile, extensionSocket, extensionInfo }) {
 
 function summarize(toolName, result) {
   if (typeof result?.message === "string") return result.message;
-  if (toolName === "chrome_status") return result.connected ? "Pi Chrome extension connected" : "Pi Chrome extension is not connected";
-  if (toolName === "chrome_list_tabs") return `Found ${Array.isArray(result?.tabs) ? result.tabs.length : 0} Chrome tabs`;
-  if (toolName === "chrome_get_state") return `Captured Chrome state for tab ${result.tab?.id ?? "?"}`;
-  if (toolName === "chrome_screenshot") return "Captured Chrome screenshot";
+  if (toolName === "status") return result.connected ? "Pi Chrome extension connected" : "Pi Chrome extension is not connected";
+  if (toolName === "list_tabs") return `Found ${Array.isArray(result?.tabs) ? result.tabs.length : 0} Chrome tabs`;
+  if (toolName === "get_state") return `Captured Chrome state for tab ${result.tab?.id ?? "?"}`;
+  if (toolName === "screenshot") return "Captured Chrome screenshot";
   return `Chrome ${toolName.replace(/^chrome_/, "")} completed`;
 }
 
@@ -409,49 +409,49 @@ function allowedBrowserUrl(value) {
   return parsed.toString();
 }
 
-async function callTool(bridge, name, args) {
+export async function callTool(bridge, name, args) {
   const canonicalName = name.startsWith("chrome_") ? name.slice("chrome_".length) : name;
   if (canonicalName === "status") {
     return mcpSuccess(name, statusPayload(bridge));
   }
   switch (canonicalName) {
-    case "chrome_list_tabs":
+    case "list_tabs":
       return mcpSuccess(name, await bridge.command("list_tabs"));
-    case "chrome_new_tab":
+    case "new_tab":
       return mcpSuccess(name, await bridge.command("new_tab", {
         url: allowedBrowserUrl(args?.url || "about:blank"),
         active: args?.active === true,
       }));
-    case "chrome_claim_tab":
+    case "claim_tab":
       return mcpSuccess(name, await bridge.command("claim_tab", {
         tabId: requiredInteger(args, "tab_id"),
         expectedTitle: args?.expected_title,
         expectedUrl: args?.expected_url,
       }));
-    case "chrome_release_tab":
+    case "release_tab":
       return mcpSuccess(name, await bridge.command("release_tab", { tabId: requiredInteger(args, "tab_id") }));
-    case "chrome_close_tab":
+    case "close_tab":
       return mcpSuccess(name, await bridge.command("close_tab", { tabId: requiredInteger(args, "tab_id"), force: args?.force === true }));
-    case "chrome_navigate":
+    case "navigate":
       return mcpSuccess(name, await bridge.command("navigate", { tabId: requiredInteger(args, "tab_id"), url: allowedBrowserUrl(args?.url) }));
-    case "chrome_get_state":
+    case "get_state":
       return mcpSuccess(name, await bridge.command("get_state", {
         tabId: requiredInteger(args, "tab_id"),
         screenshot: args?.screenshot === true,
         maxNodes: Number.isInteger(args?.max_nodes) ? args.max_nodes : 300,
         maxChars: Number.isInteger(args?.max_chars) ? args.max_chars : 24_000,
       }));
-    case "chrome_screenshot":
+    case "screenshot":
       return mcpSuccess(name, await bridge.command("screenshot", { tabId: requiredInteger(args, "tab_id"), fullPage: args?.full_page === true }));
-    case "chrome_click":
+    case "click":
       return mcpSuccess(name, await bridge.command("click", { tabId: requiredInteger(args, "tab_id"), target: targetFromArgs(args) }));
-    case "chrome_fill":
+    case "fill":
       if (typeof args?.value !== "string") throw new BridgeError("INVALID_PARAMS", "value is required");
       return mcpSuccess(name, await bridge.command("fill", { tabId: requiredInteger(args, "tab_id"), value: args.value, target: targetFromArgs(args) }));
-    case "chrome_press_key":
+    case "press_key":
       if (typeof args?.key !== "string" || args.key.length === 0) throw new BridgeError("INVALID_PARAMS", "key is required");
       return mcpSuccess(name, await bridge.command("press_key", { tabId: requiredInteger(args, "tab_id"), key: args.key, target: targetFromArgs(args) }));
-    case "chrome_wait_for":
+    case "wait_for":
       if (typeof args?.text !== "string" && typeof args?.selector !== "string") throw new BridgeError("INVALID_PARAMS", "text or selector is required");
       return mcpSuccess(name, await bridge.command("wait_for", { tabId: requiredInteger(args, "tab_id"), text: args.text, selector: args.selector, timeoutMs: Number.isInteger(args?.timeout_ms) ? args.timeout_ms : 10_000 }));
     default:

@@ -12,9 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stateful v0.2 Computer Use API with structured app state, versioned refs,
   action receipts, semantic Accessibility actions, local Vision OCR, and safer
   focus/target validation.
-- Optional `pi-chrome` MCP server and Pi Chrome Bridge MV3 extension for
-  browser-level control of claimed tabs in an existing Chrome profile without
-  macOS global mouse events.
+- Optional `pi-chrome` MCP server, Pi Chrome Bridge MV3 extension, and Pi package
+  adapter for browser-level control of claimed tabs in an existing Chrome profile
+  without macOS global mouse events.
 
 ## [0.1.0] - 2026-05-22
 

@@ -5,7 +5,7 @@ description: Control local Mac apps through Computer Use for tasks that require 
 
 ## Computer Use transport (preferred order)
 
-* For websites and local web apps, prefer the Pi-native `pi-chrome_*` MCP tools. They use the installed Pi Chrome Bridge extension, operate the existing Chrome profile through browser APIs, and do not move the macOS global pointer.
+* For websites and local web apps, prefer direct `pi_chrome_*` tools when the Pi Chrome extension adapter is installed; otherwise use the `pi-chrome_*` MCP server tools. Both use the installed Pi Chrome Bridge extension, operate the existing Chrome profile through browser APIs, and do not move the macOS global pointer.
 * For native macOS apps or browser regions that are not exposed through the DOM, prefer the Pi-native `pi-computer-use_*` MCP tools. They use the open-source Swift backend in `dhongz/pi-computer-use` and do not depend on the authenticated Codex/Sky service.
 * If both native Pi servers are unavailable, prefer `node_repl` (JavaScript) with the bundled `@oai/sky` package.
 * The harness also exposes direct `computer-use_*` tools. If Sky bootstrap fails (for example, `Sky Computer Use native pipe startup failed`) or a Sky call times out, immediately fall back to the corresponding direct tool instead of retrying repeatedly:
@@ -26,7 +26,7 @@ description: Control local Mac apps through Computer Use for tasks that require 
 
 ## Pi Chrome workflow
 
-Use `pi-chrome_*` for browser pages:
+Use `pi_chrome_*` for browser pages in Pi extension mode, or `pi-chrome_*` when using the standalone MCP server:
 
 1. Call `pi-chrome_status` and stop if the extension is not connected.
 2. Call `pi-chrome_new_tab` for a new task tab, or `pi-chrome_list_tabs` followed by `pi-chrome_claim_tab` for a user tab.

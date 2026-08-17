@@ -45,8 +45,10 @@ installer after cloning the repository:
 ```
 
 It stages the Pi Chrome extension, configures the `pi-chrome` MCP server, and
-prints the directory to load once from `chrome://extensions`. Full instructions
-are in [`docs/chrome-browser.md`](docs/chrome-browser.md).
+prints the directory to load once from `chrome://extensions`. For a first-class
+Pi package with direct `pi_chrome_*` tools, run
+`./scripts/install-pi-extension.sh` after loading the Chrome extension. Full
+instructions are in [`docs/chrome-browser.md`](docs/chrome-browser.md).
 
 ## Pi integration
 
@@ -133,8 +135,9 @@ schemas and the extension bridge are documented in
 
 ## Browser vs. desktop workflow
 
-Use the `pi-chrome_*` tools for websites and local web apps. They operate inside
-Chrome through DOM/browser APIs and do not move the macOS pointer. Use the native
+Use the `pi_chrome_*` tools in Pi extension mode, or the `pi-chrome_*` MCP
+server tools in MCP-only mode, for websites and local web apps. They operate
+inside Chrome through DOM/browser APIs and do not move the macOS pointer. Use the native
 `pi-computer-use_*` tools for Finder, Slack desktop, native settings, and other
 applications that are not browser pages. The native backend remains the fallback
 for canvas and opaque browser regions.

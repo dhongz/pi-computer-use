@@ -62,16 +62,14 @@ const disconnected = await mcpRequest(3, "tools/call", { name: "status", argumen
 assert.equal(disconnected.result.structuredContent.result.connected, false);
 
 const socket = new WebSocket(`ws://127.0.0.1:${port}/ws?token=test-token-012345678901234567890123456789`);
-const commandWaiters = new Map();
+const commandQueue = [];
+const commandWaiters = [];
 socket.on("message", data => {
   const message = JSON.parse(data.toString());
-  if (message.type === "command") {
-    const waiter = commandWaiters.get(message.id);
-    if (waiter) {
-      commandWaiters.delete(message.id);
-      waiter(message);
-    }
-  }
+  if (message.type !== "command") return;
+  const waiter = commandWaiters.shift();
+  if (waiter) waiter(message);
+  else commandQueue.push(message);
 });
 await new Promise((resolve, reject) => {
   socket.once("open", resolve);
@@ -82,26 +80,19 @@ await new Promise(resolve => setTimeout(resolve, 50));
 const connected = await mcpRequest(4, "tools/call", { name: "status", arguments: {} });
 assert.equal(connected.result.structuredContent.result.connected, true);
 
-const newTabRequest = mcpRequest(5, "tools/call", { name: "new_tab", arguments: { url: "about:blank" } });
-const command = await new Promise(resolve => {
-  const timer = setTimeout(() => resolve(null), 2_000);
-  const check = message => {
-    clearTimeout(timer);
-    resolve(message);
-  };
-  // The socket message handler above dispatches through this map.
-  commandWaiters.set("next", check);
-  const original = socket.listeners("message");
-  socket.removeAllListeners("message");
-  socket.on("message", data => {
-    const message = JSON.parse(data.toString());
-    if (message.type === "command") {
-      commandWaiters.delete("next");
-      check(message);
-    }
-    for (const listener of original) listener(data);
+function nextCommand() {
+  if (commandQueue.length > 0) return Promise.resolve(commandQueue.shift());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timed out waiting for extension command")), 2_000);
+    commandWaiters.push(message => {
+      clearTimeout(timer);
+      resolve(message);
+    });
   });
-});
+}
+
+const newTabRequest = mcpRequest(5, "tools/call", { name: "new_tab", arguments: { url: "about:blank" } });
+const command = await nextCommand();
 assert.ok(command?.id, "bridge should forward an MCP call to the extension");
 socket.send(JSON.stringify({
   type: "response",

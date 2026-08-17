@@ -99,6 +99,11 @@ keeping the implementation independent of Codex's proprietary turn metadata.
 The browser bridge is installed with `scripts/install-chrome.sh`; see
 [`docs/chrome-browser.md`](chrome-browser.md).
 
+A Pi package adapter is also available in `extensions/pi-chrome.js`. In Pi
+extension mode it registers direct `pi_chrome_*` tools and owns the bridge for
+the session lifecycle. The standalone `pi-chrome` MCP server remains available
+for other MCP clients; only one mode should own the loopback bridge at a time.
+
 The native backend remains important. It handles Finder, Slack desktop, native
 settings, canvas-like regions, and browser UI that is not exposed through the
 DOM. It uses the Accessibility tree first and CGEvent only as a documented
