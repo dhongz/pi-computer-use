@@ -349,6 +349,20 @@ export class ChromeBridge {
     }
   }
 
+  isExtensionConnected() {
+    return Boolean(this.extensionSocket && this.extensionSocket.readyState === WebSocket.OPEN && this.extensionInfo);
+  }
+
+  async waitForExtension(timeoutMs = 10_000) {
+    if (this.isExtensionConnected()) return true;
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (this.isExtensionConnected()) return true;
+    }
+    return this.isExtensionConnected();
+  }
+
   rejectPending(error) {
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);

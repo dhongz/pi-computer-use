@@ -60,6 +60,7 @@ export default function piChromeExtension(pi) {
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
           const current = await ensureBridge();
+          await current.waitForExtension(definition.name === "status" ? 5_000 : 3_000);
           return extensionResult(await callTool(current, definition.name, params ?? {}));
         } catch (error) {
           const message = error?.message ?? String(error);
@@ -79,6 +80,7 @@ export default function piChromeExtension(pi) {
     handler: async (_args, ctx) => {
       try {
         const current = await ensureBridge();
+        await current.waitForExtension(5_000);
         const result = await callTool(current, "status", {});
         const status = result.structuredContent?.result;
         ctx.ui.notify(status?.connected ? "Pi Chrome extension connected" : "Pi Chrome bridge is listening; extension is not connected", status?.connected ? "info" : "warning");
@@ -90,8 +92,9 @@ export default function piChromeExtension(pi) {
 
   pi.on("session_start", async (_event, ctx) => {
     try {
-      await ensureBridge();
-      if (ctx.hasUI) ctx.ui.setStatus("pi-chrome", "Chrome bridge listening");
+      const current = await ensureBridge();
+      await current.waitForExtension(10_000);
+      if (ctx.hasUI) ctx.ui.setStatus("pi-chrome", current.isExtensionConnected() ? "Chrome connected" : "Chrome bridge listening");
     } catch (error) {
       if (ctx.hasUI) ctx.ui.notify(`Pi Chrome bridge unavailable: ${error?.message ?? String(error)}`, "warning");
     }
