@@ -86,17 +86,17 @@ const targetProperties = {
 
 const tools = [
   {
-    name: "chrome_status",
+    name: "status",
     description: "Show whether the Pi Chrome extension is connected and ready.",
     inputSchema: toolSchema(),
   },
   {
-    name: "chrome_list_tabs",
+    name: "list_tabs",
     description: "List tabs in the user's existing Chrome profile.",
     inputSchema: toolSchema(),
   },
   {
-    name: "chrome_new_tab",
+    name: "new_tab",
     description: "Create a new tab in the user's existing Chrome profile. It is claimed by Pi and is inactive by default unless active=true.",
     inputSchema: toolSchema({
       url: { type: "string", description: "Initial URL; defaults to about:blank" },
@@ -104,27 +104,27 @@ const tools = [
     }),
   },
   {
-    name: "chrome_claim_tab",
+    name: "claim_tab",
     description: "Claim an existing Chrome tab before changing it. Use the exact tab id from chrome_list_tabs.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, expected_title: { type: "string" }, expected_url: { type: "string" } }, ["tab_id"]),
   },
   {
-    name: "chrome_release_tab",
+    name: "release_tab",
     description: "Release a claimed tab without closing it.",
     inputSchema: toolSchema({ tab_id: { type: "integer" } }, ["tab_id"]),
   },
   {
-    name: "chrome_close_tab",
+    name: "close_tab",
     description: "Close a Pi-owned or explicitly claimed Chrome tab.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, force: { type: "boolean" } }, ["tab_id"]),
   },
   {
-    name: "chrome_navigate",
+    name: "navigate",
     description: "Navigate a claimed Chrome tab without using the macOS mouse.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, url: { type: "string" } }, ["tab_id", "url"]),
   },
   {
-    name: "chrome_get_state",
+    name: "get_state",
     description: "Return a structured visible DOM/accessibility snapshot for a claimed tab, with stable node ids and optional screenshot.",
     inputSchema: toolSchema({
       tab_id: { type: "integer" },
@@ -134,27 +134,27 @@ const tools = [
     }, ["tab_id"]),
   },
   {
-    name: "chrome_screenshot",
+    name: "screenshot",
     description: "Capture a screenshot of a claimed Chrome tab through the browser bridge.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, full_page: { type: "boolean" } }, ["tab_id"]),
   },
   {
-    name: "chrome_click",
+    name: "click",
     description: "Click a unique DOM target in a claimed tab. Prefer node_id from chrome_get_state; selector/text/name are fallbacks.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, ...targetProperties }, ["tab_id"]),
   },
   {
-    name: "chrome_fill",
+    name: "fill",
     description: "Fill a unique input, textarea, select, or contenteditable element in a claimed tab.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, value: { type: "string" }, ...targetProperties }, ["tab_id", "value"]),
   },
   {
-    name: "chrome_press_key",
+    name: "press_key",
     description: "Send a browser key event to a claimed tab without using the macOS global keyboard.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, key: { type: "string" }, ...targetProperties }, ["tab_id", "key"]),
   },
   {
-    name: "chrome_wait_for",
+    name: "wait_for",
     description: "Wait for visible text or a selector to appear in a claimed tab.",
     inputSchema: toolSchema({ tab_id: { type: "integer" }, text: { type: "string" }, selector: { type: "string" }, timeout_ms: { type: "integer" } }, ["tab_id"]),
   },
@@ -410,10 +410,11 @@ function allowedBrowserUrl(value) {
 }
 
 async function callTool(bridge, name, args) {
-  if (name === "chrome_status") {
+  const canonicalName = name.startsWith("chrome_") ? name.slice("chrome_".length) : name;
+  if (canonicalName === "status") {
     return mcpSuccess(name, statusPayload(bridge));
   }
-  switch (name) {
+  switch (canonicalName) {
     case "chrome_list_tabs":
       return mcpSuccess(name, await bridge.command("list_tabs"));
     case "chrome_new_tab":

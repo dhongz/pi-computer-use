@@ -81,19 +81,19 @@ expected title and URL so a reused tab id fails closed if the tab changed.
 
 | Tool | Purpose |
 | --- | --- |
-| `chrome_status` | Bridge and extension health, install hint, capabilities |
-| `chrome_list_tabs` | List tabs, ownership, active state, URL, title |
-| `chrome_new_tab` | Create and claim a tab in the existing profile |
-| `chrome_claim_tab` | Claim an exact existing tab |
-| `chrome_release_tab` | Release a claimed tab without closing it |
-| `chrome_close_tab` | Close Pi-owned tabs; `force` is required for other tabs |
-| `chrome_navigate` | Navigate a claimed tab |
-| `chrome_get_state` | Visible DOM snapshot, roles, names, selectors, bounds, version |
-| `chrome_screenshot` | Browser-level screenshot, including background tabs |
-| `chrome_click` | DOM click without moving the macOS pointer |
-| `chrome_fill` | Fill an input/select/contenteditable element |
-| `chrome_press_key` | CDP keyboard input within the claimed tab |
-| `chrome_wait_for` | Wait for visible text or a selector |
+| `pi-chrome_status` | Bridge and extension health, install hint, capabilities |
+| `pi-chrome_list_tabs` | List tabs, ownership, active state, URL, title |
+| `pi-chrome_new_tab` | Create and claim a tab in the existing profile |
+| `pi-chrome_claim_tab` | Claim an exact existing tab |
+| `pi-chrome_release_tab` | Release a claimed tab without closing it |
+| `pi-chrome_close_tab` | Close Pi-owned tabs; `force` is required for other tabs |
+| `pi-chrome_navigate` | Navigate a claimed tab |
+| `pi-chrome_get_state` | Visible DOM snapshot, roles, names, selectors, bounds, version |
+| `pi-chrome_screenshot` | Browser-level screenshot, including background tabs |
+| `pi-chrome_click` | DOM click without moving the macOS pointer |
+| `pi-chrome_fill` | Fill an input/select/contenteditable element |
+| `pi-chrome_press_key` | CDP keyboard input within the claimed tab |
+| `pi-chrome_wait_for` | Wait for visible text or a selector |
 
 ## Security and privacy
 

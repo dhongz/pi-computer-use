@@ -57,8 +57,8 @@ await serverReady;
 const initialize = await mcpRequest(1, "initialize");
 assert.equal(initialize.result.serverInfo.name, "pi-chrome");
 const listed = await mcpRequest(2, "tools/list");
-assert.ok(listed.result.tools.some(tool => tool.name === "chrome_new_tab"));
-const disconnected = await mcpRequest(3, "tools/call", { name: "chrome_status", arguments: {} });
+assert.ok(listed.result.tools.some(tool => tool.name === "new_tab"));
+const disconnected = await mcpRequest(3, "tools/call", { name: "status", arguments: {} });
 assert.equal(disconnected.result.structuredContent.result.connected, false);
 
 const socket = new WebSocket(`ws://127.0.0.1:${port}/ws?token=test-token-012345678901234567890123456789`);
@@ -79,10 +79,10 @@ await new Promise((resolve, reject) => {
 });
 socket.send(JSON.stringify({ type: "hello", client: "pi-chrome-extension", version: "test" }));
 await new Promise(resolve => setTimeout(resolve, 50));
-const connected = await mcpRequest(4, "tools/call", { name: "chrome_status", arguments: {} });
+const connected = await mcpRequest(4, "tools/call", { name: "status", arguments: {} });
 assert.equal(connected.result.structuredContent.result.connected, true);
 
-const newTabRequest = mcpRequest(5, "tools/call", { name: "chrome_new_tab", arguments: { url: "about:blank" } });
+const newTabRequest = mcpRequest(5, "tools/call", { name: "new_tab", arguments: { url: "about:blank" } });
 const command = await new Promise(resolve => {
   const timer = setTimeout(() => resolve(null), 2_000);
   const check = message => {
