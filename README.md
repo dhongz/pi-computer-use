@@ -1,8 +1,9 @@
 # pi-computer-use
 
-**macOS computer use for AI agents** — control the apps you already have open
-(logged-in Chrome, Slack, native apps) via the Accessibility API and synthetic
-input, exposed as an MCP stdio server and a small CLI.
+**Computer use for Pi on macOS** — control native apps through the Accessibility
+API and control claimed tabs in your existing Chrome profile through a local MV3
+extension. Both surfaces are exposed as MCP stdio servers; the native backend
+also includes a diagnostic CLI.
 
 Forked from [nogu66/open-computer-use](https://github.com/nogu66/open-computer-use)
 (MIT License) and re-architected for the [Pi](https://pi.dev) coding agent.
@@ -30,11 +31,22 @@ From a checkout:
 ./scripts/install.sh --from-source  # SwiftPM build only
 ```
 
-Ensure `~/.local/bin` is on your `PATH`, then wire MCP:
+Ensure `~/.local/bin` is on your `PATH`, then wire the native MCP server:
 
 ```bash
 pi mcp add pi-computer-use -- "$(which pi-computer-use)"
 ```
+
+To add browser-level control for your existing Chrome profile, use the checkout
+installer after cloning the repository:
+
+```bash
+./scripts/install-chrome.sh
+```
+
+It stages the Pi Chrome extension, configures the `pi-chrome` MCP server, and
+prints the directory to load once from `chrome://extensions`. Full instructions
+are in [`docs/chrome-browser.md`](docs/chrome-browser.md).
 
 ## Pi integration
 
@@ -115,30 +127,50 @@ only the binary. Details: [docs/permissions.md](docs/permissions.md).
 | `menu` | Menubar path, e.g. `File/Open` |
 | `clip_get` / `clip_set` | Clipboard text |
 
-Full schemas and agent tips: [docs/tools.md](docs/tools.md).
+Full native schemas and agent tips: [docs/tools.md](docs/tools.md). Browser
+schemas and the extension bridge are documented in
+[`docs/chrome-browser.md`](docs/chrome-browser.md).
+
+## Browser vs. desktop workflow
+
+Use the `pi-chrome_*` tools for websites and local web apps. They operate inside
+Chrome through DOM/browser APIs and do not move the macOS pointer. Use the native
+`pi-computer-use_*` tools for Finder, Slack desktop, native settings, and other
+applications that are not browser pages. The native backend remains the fallback
+for canvas and opaque browser regions.
 
 ## Recommended agent workflow
 
+The MCP server is persistent: refs, the latest state, active app metadata, and
+action receipts live across sequential `tools/call` requests.
+
 1. `list_apps` — find `bundle_id` (e.g. `com.google.Chrome`)
 2. `activate` — focus the app so keystrokes do not leak elsewhere
-3. `get_ax_tree` or `ax_tree_json` — understand visible UI
-4. `click_element` / `click_ref` / `type_text` / `key_press` — act
-5. `wait_for` — bridge async page loads
-6. `screenshot` — verify visually when AX text is ambiguous
+3. `get_app_state` — inspect the coherent AX tree; set `screenshot: true` when visual verification is needed
+4. Use `click`/`click_ref`, `set_value`, `select_text`, `type_text`, `press_key`, `drag`, or `perform_secondary_action`
+5. `wait_for` — bridge async page loads; fetch `get_app_state` again after state changes
+6. `ocr` or `get_app_state` with `ocr: true` — use local Apple Vision only when AX is incomplete
+
+The compatibility aliases (`get_ax_tree`, `ax_tree_json`, `click_element`, and
+`key_press`) remain available for diagnostics and older clients. Every successful
+call includes `structuredContent` with a request ID, state metadata, and (for
+mutations) an action receipt. Stale refs return `STALE_REF` rather than silently
+clicking another element.
 
 ## Architecture
 
 ```
 Your agent (Pi / Claude / Codex / Cursor / …)
         │  MCP JSON-RPC over stdio
-        ▼
-   pi-computer-use (Swift)
-   ├── AXUIElement     read UI tree, AXPress, menus
-   ├── CGEvent         mouse, keyboard, scroll
-   └── screencapture   screenshots
-        │
-        ▼
-User's real apps (Chrome with login, etc.)
+        ├──────────────────────────────┐
+        ▼                              ▼
+   pi-computer-use (Swift)        pi-chrome (Node)
+   ├── AXUIElement                 └── authenticated WebSocket
+   ├── CGEvent                          │
+   └── screencapture                    ▼
+        │                         Pi Chrome MV3 extension
+        ▼                              │
+   Native macOS apps            Existing Chrome profile/tabs
 ```
 
 Source layout:
@@ -155,9 +187,24 @@ Sources/
   pi-computer-use/          # executable: MCP loop + CLI dispatch
 ```
 
-More detail: [docs/architecture.md](docs/architecture.md).
+More detail: [docs/architecture.md](docs/architecture.md) and
+[docs/chrome-browser.md](docs/chrome-browser.md).
 
-## Roadmap
+## v0.2 implementation notes
+
+- The native backend now exposes a persistent `ComputerUseSession` over MCP.
+- Apple Vision is the default, local OCR provider. Select it explicitly with
+  `ocr_provider: "vision"` or `PCU_OCR_PROVIDER=vision`.
+- A remote/third-party provider seam is advertised as `http` but intentionally
+  remains unconfigured and disabled. Selecting it fails safely without uploading
+  screenshots; a future provider can implement `OCRProvider` without changing
+  MCP contracts.
+- OCR fallback targets require a unique match with confidence >= 0.75 and report
+  `source: "ocr"`; AX targeting remains the default.
+- Browser pages use the optional `pi-chrome` MCP server and local Chrome extension;
+  DOM actions stay inside Chrome rather than using global macOS input.
+
+See the design and acceptance requirements in:
 
 - [Stateful Computer Use v0.2 plan](docs/stateful-computer-use-plan.md)
 - [Computer Use API contract](docs/api-contract.md)

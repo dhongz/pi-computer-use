@@ -1,7 +1,37 @@
 # MCP tool reference
 
-All tools return MCP `content` blocks. Errors set `isError: true` with a text
-explanation. Unless noted, call `activate` on the target app before typing keys.
+All tools return MCP `content` blocks and a `structuredContent` envelope. Errors
+set `isError: true` and include a structured error code. The server is persistent:
+`get_app_state` creates refs that can be consumed by later calls in the same MCP
+process. Unless noted, call `activate` on the target app before typing keys.
+
+## Stateful v0.2 tools
+
+### `get_app_state`
+
+The preferred observation call. Required: `bundle_id`. Optional: `max_depth`,
+`screenshot`, `ocr`, `ocr_provider` (`vision` or `http`), `languages`, and
+`recognition_level` (`fast` or `accurate`). It returns app/window metadata,
+structured and compact accessibility trees, `refsVersion`, optional image content,
+and OCR tokens. `vision` is local Apple Vision; `http` is an explicit unconfigured
+seam and never sends an image by default.
+
+### `click`, `set_value`, `select_text`, `press_key`, `drag`,
+`perform_secondary_action`
+
+These are the semantic v0.2 actions. Targets may use `ref` plus `refs_version`, or
+`query` with optional `role` and `exact`. Ambiguous queries fail instead of choosing
+the first match. Actions return a receipt containing `method`, target source,
+settling/state metadata, and duration. `type_text` and `press_key` verify the app is
+frontmost and has a focused AX element before posting CGEvents.
+
+### `ocr`
+
+Runs OCR on a screenshot using `provider: "vision"` by default. It accepts an
+optional top-left normalized `region` (`x`, `y`, `width`, `height`) and returns
+normalized token bounds, confidence, provider, and whether the provider is remote.
+AX lookup remains primary; click fallback uses OCR only for a unique token with
+confidence at least 0.75 and reports `method: "OCRCoordinate"`.
 
 ## `list_apps`
 

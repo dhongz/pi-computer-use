@@ -50,3 +50,7 @@ Icon?
 .env
 .env.local
 *.local
+
+# Pi Chrome bridge dependencies and generated extension credentials
+browser/node_modules/
+browser/extension/bridge-config.js

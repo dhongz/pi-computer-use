@@ -1,0 +1,16 @@
+{
+  "name": "pi-chrome-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pi-native Chrome extension bridge and MCP server",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node test/protocol.test.mjs && node --check extension/background.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
