@@ -12,6 +12,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  browser:
+    name: Chrome bridge safety and integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: browser/package-lock.json
+      - run: npm ci --prefix browser
+      - run: npm test --prefix browser
+      - uses: browser-actions/setup-chrome@v2
+        id: chrome
+        with:
+          chrome-version: stable
+      - run: npm run test:browser --prefix browser
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+
   build-and-test:
     name: Build & Test (macOS ${{ matrix.os }})
     runs-on: ${{ matrix.os }}

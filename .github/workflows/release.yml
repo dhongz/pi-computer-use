@@ -22,9 +22,11 @@ jobs:
 
       - name: Resolve tag
         id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          if [ -n "$INPUT_TAG" ]; then
+            echo "name=$INPUT_TAG" >> "$GITHUB_OUTPUT"
           else
             echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
@@ -42,23 +44,9 @@ jobs:
 
       - name: Package tarball
         id: package
-        run: |
-          NAME="pi-computer-use-${{ steps.tag.outputs.name }}-macos-universal"
-          mkdir -p "dist/$NAME"
-          cp dist/pi-computer-use "dist/$NAME/pi-computer-use"
-          cp LICENSE "dist/$NAME/LICENSE"
-          cp README.md "dist/$NAME/README.md"
-          cp scripts/install.sh "dist/$NAME/install.sh"
-          cp scripts/install-chrome.sh "dist/$NAME/install-chrome.sh"
-          cp scripts/chrome-mcp-server.sh "dist/$NAME/chrome-mcp-server.sh"
-          cp scripts/chrome-daemon.sh "dist/$NAME/chrome-daemon.sh"
-          cp -R browser "dist/$NAME/browser"
-          cp docs/chrome-browser.md "dist/$NAME/chrome-browser.md"
-          chmod +x "dist/$NAME/install.sh" "dist/$NAME/install-chrome.sh" "dist/$NAME/chrome-mcp-server.sh" "dist/$NAME/chrome-daemon.sh"
-          (cd dist && tar -czf "$NAME.tar.gz" "$NAME")
-          shasum -a 256 "dist/$NAME.tar.gz" | awk -v name="$NAME.tar.gz" '{print $1 "  " name}' > "dist/$NAME.tar.gz.sha256"
-          echo "tarball=dist/$NAME.tar.gz" >> "$GITHUB_OUTPUT"
-          echo "sha=dist/$NAME.tar.gz.sha256" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.name }}
+        run: bash scripts/package-release.sh "$RELEASE_TAG" dist/pi-computer-use dist
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2

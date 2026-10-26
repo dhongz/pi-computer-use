@@ -11,16 +11,13 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import readline from "node:readline";
 import { WebSocket, WebSocketServer } from "ws";
-import { ChromeDaemonClient } from "./client.mjs";
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+import { ChromeDaemonClient, commandTimeout } from "./client.mjs";
 const DEFAULT_PORT = 37842;
 const DEFAULT_TOKEN_FILE = path.join(os.homedir(), ".pi", "agent", "chrome-bridge-token");
-const SERVER_VERSION = "0.1.0";
-const COMMAND_TIMEOUT_MS = 30_000;
+const SERVER_VERSION = "0.2.0";
 
 class BridgeError extends Error {
   constructor(code, message, details = {}) {
@@ -171,21 +168,6 @@ function extensionInstallPath() {
   return path.join(os.homedir(), ".pi", "agent", "chrome-extension");
 }
 
-function statusPayload({ port, tokenFile, extensionSocket, extensionInfo }) {
-  return {
-    connected: Boolean(extensionSocket && extensionSocket.readyState === WebSocket.OPEN),
-    server: "pi-chrome",
-    version: SERVER_VERSION,
-    host: "127.0.0.1",
-    port,
-    extension: extensionInfo ?? null,
-    extensionPath: extensionInstallPath(),
-    tokenFile,
-    installHint: "Run scripts/install-chrome.sh, then load the printed extension directory at chrome://extensions.",
-    capabilities: ["tabs", "domSnapshot", "playwrightLikeActions", "screenshots", "browserViewportInput"],
-  };
-}
-
 function summarize(toolName, result) {
   if (typeof result?.message === "string") return result.message;
   if (toolName === "status") return result.connected ? "Pi Chrome extension connected" : "Pi Chrome extension is not connected";
@@ -240,7 +222,7 @@ function mcpSuccess(toolName, result) {
 }
 
 function mcpError(error) {
-  const code = error?.code ?? "CHROME_BRIDGE_ERROR";
+  const code = error?.name === "AbortError" ? "ABORTED" : error?.code ?? "CHROME_BRIDGE_ERROR";
   const message = error?.message ?? String(error);
   return {
     content: [{ type: "text", text: message }],
@@ -250,7 +232,7 @@ function mcpError(error) {
       error: {
         code,
         message,
-        retryable: code !== "INVALID_PARAMS",
+        retryable: code !== "INVALID_PARAMS" && code !== "ABORTED",
         details: error?.details ?? {},
       },
     },
@@ -351,8 +333,6 @@ export class ChromeBridge {
     if (message?.type !== "response" || typeof message.id !== "string") return;
     const pending = this.pending.get(message.id);
     if (!pending) return;
-    this.pending.delete(message.id);
-    clearTimeout(pending.timer);
     if (message.ok === false || message.error) {
       pending.reject(new BridgeError(message.error?.code ?? "EXTENSION_ERROR", message.error?.message ?? "Chrome extension command failed", message.error?.details ?? {}));
     } else {
@@ -375,14 +355,11 @@ export class ChromeBridge {
   }
 
   rejectPending(error) {
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(error);
-    }
-    this.pending.clear();
+    for (const pending of this.pending.values()) pending.reject(error);
   }
 
-  async command(method, params = {}, timeoutMs = COMMAND_TIMEOUT_MS) {
+  async command(method, params = {}, timeoutMs = commandTimeout(method, params), signal) {
+    signal?.throwIfAborted();
     if (!this.extensionSocket || this.extensionSocket.readyState !== WebSocket.OPEN || !this.extensionInfo) {
       throw new BridgeError("EXTENSION_NOT_CONNECTED", "Pi Chrome extension is not connected. Load the installed extension and keep the pi-chrome MCP server running.", {
         extensionPath: extensionInstallPath(),
@@ -393,18 +370,31 @@ export class ChromeBridge {
     const id = crypto.randomUUID();
     const payload = JSON.stringify({ type: "command", id, method, params });
     return await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new BridgeError("CHROME_COMMAND_TIMEOUT", `Chrome command '${method}' timed out after ${timeoutMs}ms`, { method, timeoutMs }));
-      }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
-      try {
-        this.extensionSocket.send(payload);
-      } catch (error) {
+      const socket = this.extensionSocket;
+      let timer;
+      let settled = false;
+      const finish = (error, value) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
         this.pending.delete(id);
-        reject(new BridgeError("EXTENSION_SEND_FAILED", error.message));
-      }
+        error ? reject(error) : resolve(value);
+      };
+      const cancel = () => {
+        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "cancel", id }));
+      };
+      const abort = () => { cancel(); finish(signal.reason || new DOMException("Operation aborted", "AbortError")); };
+      timer = setTimeout(() => {
+        cancel();
+        finish(new BridgeError("CHROME_COMMAND_TIMEOUT", `Chrome command '${method}' timed out after ${timeoutMs}ms`, { method, timeoutMs }));
+      }, timeoutMs);
+      this.pending.set(id, { resolve: value => finish(null, value), reject: error => finish(error) });
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) { abort(); return; }
+      try {
+        socket.send(payload);
+      } catch (error) { finish(new BridgeError("EXTENSION_SEND_FAILED", error.message)); }
     });
   }
 
@@ -434,57 +424,60 @@ function allowedBrowserUrl(value) {
   return parsed.toString();
 }
 
-export async function callTool(bridge, name, args) {
+export async function callTool(bridge, name, args = {}, { signal } = {}) {
+  signal?.throwIfAborted();
+  const command = (method, params = {}) => bridge.command(method, params, commandTimeout(method, params), signal);
   const canonicalName = name.startsWith("chrome_") ? name.slice("chrome_".length) : name;
   if (canonicalName === "status") {
-    return mcpSuccess(name, await bridge.command("status"));
+    return mcpSuccess(name, await command("status"));
   }
   switch (canonicalName) {
     case "list_tabs":
-      return mcpSuccess(name, await bridge.command("list_tabs"));
+      return mcpSuccess(name, await command("list_tabs"));
     case "new_tab":
       if (args?.group_title !== undefined && (typeof args.group_title !== "string" || !args.group_title.trim() || args.group_title.length > 80)) {
         throw new BridgeError("INVALID_PARAMS", "group_title must be a non-empty string of at most 80 characters");
       }
-      return mcpSuccess(name, await bridge.command("new_tab", {
+      return mcpSuccess(name, await command("new_tab", {
         url: allowedBrowserUrl(args?.url || "about:blank"),
         active: args?.active === true,
         groupTitle: args?.group_title?.trim() ?? "Browser task",
       }));
     case "close_group":
-      return mcpSuccess(name, await bridge.command("close_group"));
+      return mcpSuccess(name, await command("close_group"));
     case "claim_tab":
-      return mcpSuccess(name, await bridge.command("claim_tab", {
+      return mcpSuccess(name, await command("claim_tab", {
         tabId: requiredInteger(args, "tab_id"),
         expectedTitle: args?.expected_title,
         expectedUrl: args?.expected_url,
       }));
     case "release_tab":
-      return mcpSuccess(name, await bridge.command("release_tab", { tabId: requiredInteger(args, "tab_id") }));
+      return mcpSuccess(name, await command("release_tab", { tabId: requiredInteger(args, "tab_id") }));
     case "close_tab":
-      return mcpSuccess(name, await bridge.command("close_tab", { tabId: requiredInteger(args, "tab_id"), force: args?.force === true }));
+      return mcpSuccess(name, await command("close_tab", { tabId: requiredInteger(args, "tab_id"), force: args?.force === true }));
     case "navigate":
-      return mcpSuccess(name, await bridge.command("navigate", { tabId: requiredInteger(args, "tab_id"), url: allowedBrowserUrl(args?.url) }));
+      return mcpSuccess(name, await command("navigate", { tabId: requiredInteger(args, "tab_id"), url: allowedBrowserUrl(args?.url) }));
     case "get_state":
-      return mcpSuccess(name, await bridge.command("get_state", {
+      return mcpSuccess(name, await command("get_state", {
         tabId: requiredInteger(args, "tab_id"),
         screenshot: args?.screenshot === true,
         maxNodes: Number.isInteger(args?.max_nodes) ? args.max_nodes : 300,
         maxChars: Number.isInteger(args?.max_chars) ? args.max_chars : 24_000,
       }));
     case "screenshot":
-      return mcpSuccess(name, await bridge.command("screenshot", { tabId: requiredInteger(args, "tab_id"), fullPage: args?.full_page === true }));
+      return mcpSuccess(name, await command("screenshot", { tabId: requiredInteger(args, "tab_id"), fullPage: args?.full_page === true }));
     case "click":
-      return mcpSuccess(name, await bridge.command("click", { tabId: requiredInteger(args, "tab_id"), target: targetFromArgs(args) }));
+      return mcpSuccess(name, await command("click", { tabId: requiredInteger(args, "tab_id"), target: targetFromArgs(args) }));
     case "fill":
       if (typeof args?.value !== "string") throw new BridgeError("INVALID_PARAMS", "value is required");
-      return mcpSuccess(name, await bridge.command("fill", { tabId: requiredInteger(args, "tab_id"), value: args.value, target: targetFromArgs(args) }));
+      return mcpSuccess(name, await command("fill", { tabId: requiredInteger(args, "tab_id"), value: args.value, target: targetFromArgs(args) }));
     case "press_key":
       if (typeof args?.key !== "string" || args.key.length === 0) throw new BridgeError("INVALID_PARAMS", "key is required");
-      return mcpSuccess(name, await bridge.command("press_key", { tabId: requiredInteger(args, "tab_id"), key: args.key, target: targetFromArgs(args) }));
+      return mcpSuccess(name, await command("press_key", { tabId: requiredInteger(args, "tab_id"), key: args.key, target: targetFromArgs(args) }));
     case "wait_for":
       if (typeof args?.text !== "string" && typeof args?.selector !== "string") throw new BridgeError("INVALID_PARAMS", "text or selector is required");
-      return mcpSuccess(name, await bridge.command("wait_for", { tabId: requiredInteger(args, "tab_id"), text: args.text, selector: args.selector, timeoutMs: Number.isInteger(args?.timeout_ms) ? args.timeout_ms : 10_000 }));
+      if (args?.timeout_ms !== undefined && (!Number.isInteger(args.timeout_ms) || args.timeout_ms < 0 || args.timeout_ms > 120_000)) throw new BridgeError("INVALID_PARAMS", "timeout_ms must be an integer from 0 to 120000");
+      return mcpSuccess(name, await command("wait_for", { tabId: requiredInteger(args, "tab_id"), text: args.text, selector: args.selector, timeoutMs: Number.isInteger(args?.timeout_ms) ? args.timeout_ms : 10_000 }));
     default:
       throw new BridgeError("INVALID_PARAMS", `unknown tool: ${name}`);
   }
@@ -502,6 +495,7 @@ export async function startServer(options = {}) {
   const bridge = await ChromeDaemonClient.connect(options);
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   let closed = false;
+  const requests = new Map();
 
   const writeResponse = value => {
     process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -517,6 +511,10 @@ export async function startServer(options = {}) {
     const id = message.id;
     const method = message.method;
     if (method === "notifications/initialized") return;
+    if (method === "notifications/cancelled") {
+      requests.get(message.params?.requestId)?.abort();
+      return;
+    }
     if (method === "ping") {
       writeResponse({ jsonrpc: "2.0", id, result: {} });
       return;
@@ -538,12 +536,16 @@ export async function startServer(options = {}) {
       return;
     }
     if (method === "tools/call") {
+      const controller = new AbortController();
+      requests.set(id, controller);
       try {
         const params = message.params ?? {};
-        const result = await callTool(bridge, params.name, params.arguments ?? {});
+        const result = await callTool(bridge, params.name, params.arguments ?? {}, { signal: controller.signal });
         writeResponse({ jsonrpc: "2.0", id, result });
       } catch (error) {
         writeResponse({ jsonrpc: "2.0", id, result: mcpError(error) });
+      } finally {
+        requests.delete(id);
       }
       return;
     }
@@ -558,9 +560,11 @@ export async function startServer(options = {}) {
   const shutdown = async () => {
     if (closed) return;
     closed = true;
+    for (const controller of requests.values()) controller.abort();
     rl.close();
     await bridge.close();
   };
+  rl.on("close", () => void shutdown());
   process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
   process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
   process.once("exit", () => bridge.close());

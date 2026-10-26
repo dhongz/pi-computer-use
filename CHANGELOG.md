@@ -16,6 +16,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Bridge MV3 extension, and Pi package adapter for browser-level control of
   claimed tabs in an existing Chrome profile without macOS global mouse events.
 
+### Fixed
+
+- Chrome node references now retain element identity and reject snapshots after
+  DOM mutations, rather than resolving old references to a different list row.
+- Browser actions reject disabled, read-only, inert, or covered controls and
+  invalid dropdown options instead of reporting a successful no-op.
+- Pi and MCP cancellation now reaches queued commands and browser polling.
+  Long waits use matching transport deadlines.
+- Concurrent tab claims reserve ownership before accessing Chrome. Group cleanup
+  rechecks membership before removal and preserves tabs moved out during cleanup.
+- Concurrent reconnects share one socket; disconnected Pi adapters can start a
+  fresh connection instead of retaining a completed startup promise.
+- Release archives preserve browser script paths and omit installed dependencies
+  and local bridge credentials. CI runs safety tests and real headless Chrome
+  integration tests without an added test framework.
+
+### Removed
+
+- Unused duplicate DOM helpers and an unused status formatter.
+
 ## [0.1.0] - 2026-05-22
 
 ### Added
