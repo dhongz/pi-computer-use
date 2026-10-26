@@ -713,14 +713,43 @@ async function listTabs() {
   return { tabs: tabs.filter(tab => tab.id != null).map(tabInfo), sessionId: bridgeSessionId };
 }
 
-async function newTab({ url = "about:blank", active = false } = {}) {
-  const tab = await chrome.tabs.create({ url, active: Boolean(active) });
+async function newTab({ url = "about:blank", active = false, groupId, groupTitle = "Browser task" } = {}) {
+  let group;
+  if (Number.isInteger(groupId) && groupId >= 0) {
+    try { group = await chrome.tabGroups.get(groupId); } catch { /* The user may have closed the group. */ }
+  }
+  const tab = await chrome.tabs.create({ url, active: Boolean(active), ...(group ? { windowId: group.windowId } : {}) });
   if (tab.id == null) throw new ChromeBridgeError("TAB_CREATE_FAILED", "Chrome did not return an id for the new tab");
-  claimedTabs.add(tab.id);
-  ownedTabs.add(tab.id);
-  invalidateSnapshot(tab.id);
-  await persistOwnership();
-  return { tab: tabInfo(tab), message: `Created and claimed Chrome tab ${tab.id}` };
+  try {
+    const taskGroupId = await chrome.tabs.group({ tabIds: [tab.id], ...(group ? { groupId: group.id } : {}) });
+    if (!group) await chrome.tabGroups.update(taskGroupId, { title: `Pi · ${groupTitle}`, color: "blue" });
+    claimedTabs.add(tab.id);
+    ownedTabs.add(tab.id);
+    await persistOwnership();
+    return { tab: tabInfo(await getTab(tab.id)), message: `Created and claimed Chrome tab ${tab.id} in task group ${taskGroupId}` };
+  } catch (error) {
+    claimedTabs.delete(tab.id);
+    ownedTabs.delete(tab.id);
+    await chrome.tabs.remove(tab.id).catch(() => {});
+    throw new ChromeBridgeError("GROUP_CREATE_FAILED", "Could not create the task group; reload Pi Chrome Bridge and check its tabGroups permission", { cause: String(error) });
+  }
+}
+
+async function closeGroup({ groupId, tabIds = [] }) {
+  if (!Number.isInteger(groupId) || groupId < 0) throw new ChromeBridgeError("INVALID_GROUP", "A task group id is required");
+  const allowed = new Set(tabIds);
+  const tabs = await chrome.tabs.query({ groupId });
+  const closedTabIds = [];
+  const preservedTabIds = [];
+  for (const tab of tabs) {
+    if (allowed.has(tab.id) && ownedTabs.has(tab.id) && claimedTabs.has(tab.id)) {
+      await closeTab({ tabId: tab.id });
+      closedTabIds.push(tab.id);
+    } else {
+      preservedTabIds.push(tab.id);
+    }
+  }
+  return { groupId, closedTabIds, preservedTabIds, message: `Closed ${closedTabIds.length} task tabs; preserved ${preservedTabIds.length} other tabs` };
 }
 
 async function claimTab({ tabId, expectedTitle, expectedUrl } = {}) {
@@ -859,6 +888,7 @@ async function dispatch(method, params) {
   switch (method) {
     case "list_tabs": return await listTabs();
     case "new_tab": return await newTab(params);
+    case "close_group": return await closeGroup(params);
     case "claim_tab": return await claimTab(params);
     case "release_tab": return await releaseTab(params);
     case "close_tab": return await closeTab(params);

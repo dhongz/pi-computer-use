@@ -5,6 +5,7 @@
   "description": "Lets Pi control claimed Chrome tabs through browser APIs instead of macOS global input.",
   "permissions": [
     "tabs",
+    "tabGroups",
     "scripting",
     "storage",
     "alarms",

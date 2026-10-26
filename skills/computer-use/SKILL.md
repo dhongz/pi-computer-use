@@ -26,15 +26,17 @@ description: Control local Mac apps through Computer Use for tasks that require 
 
 ## Pi Chrome workflow
 
+Read `../pi-chrome/SKILL.md` for browser tasks. It covers labeled task groups and cleanup.
+
 Use `pi_chrome_*` for browser pages in Pi extension mode, or `pi-chrome_*` when using the standalone MCP server:
 
 1. Call `pi-chrome_status` and stop if the extension is not connected.
-2. Call `pi-chrome_new_tab` for a new task tab, or `pi-chrome_list_tabs` followed by `pi-chrome_claim_tab` for a user tab.
+2. Call `pi-chrome_new_tab` with a short `group_title` for a new task tab. Further tabs reuse the session's group. For an existing user tab, list tabs and claim its exact ID without moving it into the task group.
 3. Call `pi-chrome_get_state` to obtain the visible DOM snapshot, roles, names, selectors, and `state_version`.
 4. Use `pi-chrome_click`, `pi-chrome_fill`, or `pi-chrome_press_key` with a `node_id` and its matching `state_version`.
 5. Call `pi-chrome_get_state` again after actions; stale node ids must be refreshed rather than guessed.
 6. Use `pi-chrome_wait_for` for navigation and asynchronous page changes, and `pi-chrome_screenshot` when visual verification is needed.
-7. Release user-owned tabs with `pi-chrome_release_tab`; close only Pi-owned tabs unless the user explicitly requests otherwise.
+7. When finished, call `pi-chrome_close_group` after checking for unsaved work. Release claimed user tabs with `pi-chrome_release_tab`; don't close them.
 
 Browser actions run inside Chrome and do not use macOS global mouse events. The
 Pi adapter and standalone MCP client share one per-profile daemon; do not start
@@ -70,7 +72,8 @@ The native server is configured in Pi's MCP configuration and can be backed by:
 ```ts
 pi-chrome_status(): Promise<BridgeStatus>;
 pi-chrome_list_tabs(): Promise<TabInfo[]>;
-pi-chrome_new_tab({ url?: string, active?: boolean }): Promise<TabInfo>;
+pi-chrome_new_tab({ url?: string, active?: boolean, group_title?: string }): Promise<TabInfo>;
+pi-chrome_close_group(): Promise<{ closedTabIds: number[], preservedTabIds: number[] }>;
 pi-chrome_claim_tab({ tab_id: number, expected_title?: string, expected_url?: string }): Promise<TabInfo>;
 pi-chrome_get_state({ tab_id: number, screenshot?: boolean }): Promise<ChromeState>;
 pi-chrome_click({ tab_id: number, node_id?: string, state_version?: number, selector?: string, text?: string, role?: string, name?: string }): Promise<ActionReceipt>;
