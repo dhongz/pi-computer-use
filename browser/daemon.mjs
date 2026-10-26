@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { ChromeBridge } from "./server.mjs";
+import { commandTimeout } from "./client.mjs";
 
 const DEFAULT_BROWSER_PORT = 37842;
 const DEFAULT_CONTROL_PORT = 37843;
@@ -62,6 +63,7 @@ export class ChromeDaemon {
 
   async start() {
     this.bridge = await new ChromeBridge({ port: this.browserPort, tokenFile: this.tokenFile }).start();
+    this.browserPort = this.bridge.port;
     const token = await readToken(this.tokenFile);
     this.controlWss = new WebSocketServer({
       host: "127.0.0.1",
@@ -84,10 +86,11 @@ export class ChromeDaemon {
   }
 
   handleClient(socket) {
-    const client = { socket, sessionId: null };
+    const client = { socket, sessionId: null, requests: new Map() };
     this.clients.set(socket, client);
     socket.on("message", data => void this.handleClientMessage(client, data));
     socket.on("close", () => {
+      for (const controller of client.requests.values()) controller.abort();
       void this.releaseSession(client).finally(() => this.clients.delete(socket));
     });
     socket.on("error", error => log(`client socket error: ${error.message}`));
@@ -119,16 +122,26 @@ export class ChromeDaemon {
       });
       return;
     }
+    if (message.type === "cancel") {
+      client.requests.get(message.id)?.abort();
+      return;
+    }
     if (message.type !== "command" || typeof message.id !== "string") return;
     if (!client.sessionId) {
       this.send(client, { type: "response", id: message.id, ok: false, error: { code: "CLIENT_NOT_INITIALIZED", message: "Send client_hello before commands" } });
       return;
     }
+    const controller = new AbortController();
+    client.requests.set(message.id, controller);
     try {
-      const result = await this.command(client, message.method, message.params ?? {});
+      const timeoutMs = message.timeoutMs ?? commandTimeout(message.method, message.params);
+      if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 125_000) throw new DaemonError("INVALID_PARAMS", "Invalid command timeout");
+      const result = await this.command(client, message.method, message.params ?? {}, timeoutMs, controller.signal);
       this.send(client, { type: "response", id: message.id, ok: true, result });
     } catch (error) {
-      this.send(client, { type: "response", id: message.id, ok: false, error: { code: error.code ?? "DAEMON_COMMAND_FAILED", message: error.message ?? String(error), details: error.details ?? {} } });
+      this.send(client, { type: "response", id: message.id, ok: false, error: { code: controller.signal.aborted ? "ABORTED" : error.code ?? "DAEMON_COMMAND_FAILED", message: error.message ?? String(error), details: error.details ?? {} } });
+    } finally {
+      client.requests.delete(message.id);
     }
   }
 
@@ -141,10 +154,16 @@ export class ChromeDaemon {
     if (tab === null) throw new DaemonError("INVALID_TAB", "tab_id must be a positive integer");
     const owner = this.owner(tab);
     if (!owner || owner.sessionId !== client.sessionId) throw new DaemonError("TAB_NOT_OWNED", `Chrome tab ${tab} is not owned by this Pi session`, { tabId: tab });
+    if (owner.claiming) throw new DaemonError("TAB_CLAIM_PENDING", `Chrome tab ${tab} is still being claimed`);
     return tab;
   }
 
-  async command(client, method, params) {
+  async command(client, method, params = {}, timeoutMs = commandTimeout(method, params), signal) {
+    signal?.throwIfAborted();
+    const forward = (name, args) => {
+      signal?.throwIfAborted();
+      return this.bridge.command(name, args, timeoutMs, signal);
+    };
     if (method === "status") {
       return {
         connected: this.bridge.isExtensionConnected(),
@@ -158,7 +177,7 @@ export class ChromeDaemon {
     }
 
     if (method === "list_tabs") {
-      const result = await this.bridge.command(method, params);
+      const result = await forward(method, params);
       return {
         ...result,
         tabs: (result.tabs ?? []).map(tab => ({
@@ -175,11 +194,11 @@ export class ChromeDaemon {
       // Serialize creation and cleanup so parallel tool calls share one group.
       task.pending = task.pending.catch(() => {}).then(async () => {
         if (method === "new_tab") {
-          const result = await this.bridge.command(method, { ...params, groupId: task.groupId });
+          const result = await forward(method, { ...params, groupId: task.groupId });
           const tabId = id(result.tab?.id);
           if (tabId === null) throw new DaemonError("TAB_CREATE_FAILED", "Chrome did not return a tab id");
           if (!Number.isInteger(result.tab.groupId) || result.tab.groupId < 0) {
-            await this.bridge.command("close_tab", { tabId });
+            await forward("close_tab", { tabId });
             throw new DaemonError("GROUP_UNAVAILABLE", "Chrome bridge did not group the new tab; reload the Chrome extension", { tabId });
           }
           task.groupId = result.tab.groupId;
@@ -190,7 +209,7 @@ export class ChromeDaemon {
         const tabIds = [...this.ownerByTab.entries()]
           .filter(([, owner]) => owner.sessionId === client.sessionId && owner.agentOwned)
           .map(([tabId]) => tabId);
-        const result = await this.bridge.command(method, { groupId: task.groupId, tabIds });
+        const result = await forward(method, { groupId: task.groupId, tabIds });
         for (const tabId of result.closedTabIds ?? []) this.ownerByTab.delete(tabId);
         task.groupId = null;
         return result;
@@ -203,14 +222,26 @@ export class ChromeDaemon {
       if (tabId === null) throw new DaemonError("INVALID_TAB", "tab_id must be a positive integer");
       const owner = this.owner(tabId);
       if (owner && owner.sessionId !== client.sessionId) throw new DaemonError("TAB_OWNED", `Chrome tab ${tabId} is owned by another Pi session`, { tabId });
-      const result = await this.bridge.command(method, params);
-      this.ownerByTab.set(tabId, { sessionId: client.sessionId, agentOwned: false });
-      return result;
+      if (owner?.claiming) throw new DaemonError("TAB_CLAIM_PENDING", `Chrome tab ${tabId} is still being claimed`);
+      const reservation = { sessionId: client.sessionId, agentOwned: owner?.agentOwned ?? false, claiming: true };
+      this.ownerByTab.set(tabId, reservation);
+      try {
+        const result = await forward(method, params);
+        signal?.throwIfAborted();
+        reservation.claiming = false;
+        return result;
+      } catch (error) {
+        if (this.owner(tabId) === reservation) {
+          if (owner) this.ownerByTab.set(tabId, owner);
+          else this.ownerByTab.delete(tabId);
+        }
+        throw error;
+      }
     }
 
     if (method === "release_tab") {
       const tabId = this.requireOwner(client, params.tabId);
-      const result = await this.bridge.command(method, params);
+      const result = await forward(method, params);
       this.ownerByTab.delete(tabId);
       return result;
     }
@@ -221,7 +252,8 @@ export class ChromeDaemon {
       const owner = this.owner(tabId);
       if (owner && owner.sessionId !== client.sessionId) throw new DaemonError("TAB_OWNED", `Chrome tab ${tabId} is owned by another Pi session`, { tabId });
       if (!owner && params.force !== true) throw new DaemonError("TAB_NOT_OWNED", `Chrome tab ${tabId} is not owned by this Pi session; pass force=true to close it`);
-      const result = await this.bridge.command(method, params);
+      if (owner?.claiming) throw new DaemonError("TAB_CLAIM_PENDING", `Chrome tab ${tabId} is still being claimed`);
+      const result = await forward(method, params);
       this.ownerByTab.delete(tabId);
       return result;
     }
@@ -229,7 +261,7 @@ export class ChromeDaemon {
     if (["navigate", "get_state", "screenshot", "click", "fill", "press_key", "wait_for"].includes(method)) {
       this.requireOwner(client, params.tabId);
     }
-    return await this.bridge.command(method, params);
+    return await forward(method, params);
   }
 
   async releaseSession(client) {

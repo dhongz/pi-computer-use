@@ -57,9 +57,11 @@ const ready = new Promise((resolve, reject) => {
 await ready;
 const browserSocket = new WebSocket(`ws://127.0.0.1:${browserPort}/ws?token=${token}`);
 const commandQueue = [];
+let onCancel;
 const commandWaiters = [];
 browserSocket.on("message", data => {
   const message = JSON.parse(data.toString());
+  if (message.type === "cancel") onCancel?.(message);
   if (message.type !== "command") return;
   const waiter = commandWaiters.shift();
   if (waiter) waiter(message);
@@ -81,6 +83,7 @@ function respond(command, result) {
 
 let clientOne;
 let clientTwo;
+let mcp;
 try {
   await ready;
   await new Promise((resolve, reject) => {
@@ -109,6 +112,16 @@ try {
   assert.equal(sharedStatus.sessions, 2);
   await assert.rejects(() => clientTwo.command("get_state", { tabId: 123 }), error => error.code === "TAB_NOT_OWNED");
 
+  const abort = new AbortController();
+  const cancelled = new Promise(resolve => { onCancel = resolve; });
+  const wait = clientOne.command("wait_for", { tabId: 123, text: "later", timeoutMs: 60000 }, undefined, abort.signal);
+  const rejected = assert.rejects(wait, { name: "AbortError" });
+  const waitCommand = await nextCommand();
+  assert.equal(waitCommand.method, "wait_for");
+  abort.abort();
+  await rejected;
+  assert.equal((await cancelled).id, waitCommand.id, "the daemon must forward cancellation to the browser");
+
   await clientOne.close();
   const releaseCommand = await nextCommand();
   assert.equal(releaseCommand.method, "release_tab");
@@ -121,8 +134,46 @@ try {
   const claim = await claimPromise;
   assert.equal(claim.tab.id, 123);
 
-  console.log("PASS: shared Pi Chrome daemon multiplexes sessions and enforces tab ownership");
+  mcp = spawn(process.execPath, [path.join(root, "browser", "server.mjs")], {
+    cwd: root,
+    env: { ...process.env, PI_CHROME_PORT: String(browserPort), PI_CHROME_CONTROL_PORT: String(controlPort), PI_CHROME_TOKEN_FILE: tokenFile },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  mcp.stderr.resume();
+  const mcpExit = new Promise(resolve => mcp.once("exit", resolve));
+  const responses = new Map();
+  readline.createInterface({ input: mcp.stdout }).on("line", line => {
+    const response = JSON.parse(line);
+    responses.get(response.id)?.(response.result);
+    responses.delete(response.id);
+  });
+  const rpc = (id, name, args) => {
+    const result = new Promise(resolve => responses.set(id, resolve));
+    mcp.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } })}\n`);
+    return result;
+  };
+  const created = rpc(1, "new_tab", { url: "https://example.com/" });
+  const createdCommand = await nextCommand();
+  assert.equal(createdCommand.method, "new_tab");
+  respond(createdCommand, { tab: { id: 456, groupId: 8, url: "https://example.com/" } });
+  assert.equal((await created).structuredContent.result.tab.id, 456);
+  const waiting = rpc(2, "wait_for", { tab_id: 456, text: "later", timeout_ms: 60000 });
+  const browserWait = await nextCommand();
+  const mcpCancel = new Promise(resolve => { onCancel = resolve; });
+  mcp.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 2 } })}\n`);
+  assert.equal((await mcpCancel).id, browserWait.id);
+  const cancelledResult = await waiting;
+  assert.equal(cancelledResult.isError, true);
+  assert.equal(cancelledResult.structuredContent.error.code, "ABORTED");
+  mcp.stdin.end();
+  const mcpRelease = await nextCommand();
+  assert.equal(mcpRelease.method, "release_tab");
+  assert.equal(mcpRelease.params.tabId, 456);
+  respond(mcpRelease, { tab: { id: 456 } });
+  assert.equal(await mcpExit, 0);
+  console.log("PASS: shared sessions, tab ownership, MCP cancellation, and EOF cleanup");
 } finally {
+  if (mcp?.exitCode === null) mcp.kill("SIGTERM");
   await clientOne?.close();
   if (clientTwo?.socket?.readyState === 1) {
     const closePromise = clientTwo.close();

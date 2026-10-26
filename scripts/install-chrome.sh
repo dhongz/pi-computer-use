@@ -10,6 +10,10 @@ if [[ -z "${NODE_BIN}" ]]; then
   exit 1
 fi
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  exec "${NODE_BIN}" "${ROOT}/browser/install.mjs" "$@"
+fi
+
 if [[ ! -d "${ROOT}/browser/node_modules/ws" ]]; then
   NPM_BIN="${NPM_BIN:-$(command -v npm || true)}"
   if [[ -z "${NPM_BIN}" ]]; then

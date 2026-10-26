@@ -107,10 +107,53 @@ instructs the agent to clean up when finished.
 Updating an existing installation requires re-staging the Chrome extension and
 reloading it at `chrome://extensions` to grant the `tabGroups` permission. Restart
 the shared daemon when no sessions own tabs, then run `/reload` in Pi to load the
-new tool and skill.
+new tool and skill. For Pi extension mode, stage with
+`./scripts/install-chrome.sh --no-configure-pi` so the update doesn't re-enable
+duplicate standalone MCP tools. Reload the Chrome extension after staging;
+updating files alone doesn't update a running service worker.
 
 Existing tabs are not changed until explicitly claimed. Claiming can include an
 expected title and URL so a reused tab id fails closed if the tab changed.
+
+## Action safety and cancellation
+
+Snapshot references point to actual elements in Chrome's isolated extension
+world, not a CSS position in a list. A DOM mutation invalidates the snapshot;
+refresh it on `STALE_STATE`. This is deliberately conservative on pages that
+update often. Selector and role/name fallbacks still resolve against the current
+page and must uniquely identify the intended target.
+
+Clicks reject disabled, inert, or covered controls. Filling rejects read-only
+controls and dropdown options that are missing or disabled. The bridge checks
+that a filled value was retained synchronously. A click or key receipt confirms
+dispatch, not that the application saved data; inspect fresh state afterward.
+
+Pi cancellation is checked before dispatch and forwarded through the daemon to
+browser commands. It stops queued commands and polling waits, but it cannot
+undo a click, navigation, or tab removal already handed to Chrome. Refresh state
+before retrying an interrupted operation. `wait_for.timeout_ms` accepts 0 through
+120000; both transports allow five seconds beyond longer polling deadlines.
+
+## Tests
+
+```bash
+npm ci --prefix browser
+npm test --prefix browser
+CHROME_BIN=/path/to/chrome-for-testing npm run test:browser --prefix browser
+```
+
+The Node tests cover connection recovery, cancellation, session ownership,
+cleanup races, and release packaging. The integration test starts an isolated
+headless Chrome for Testing or Chromium with a temporary profile and its own
+bridge ports. It uses only local fixture pages and deletes the temporary profile
+afterward; it does not attach to your existing browser. CI runs both suites in a
+separate Linux job alongside the Swift jobs. No additional test framework or
+compiler is required.
+
+Release archives preserve the checkout's `scripts/`, `browser/`, `extensions/`,
+and `skills/` layout. Run `scripts/install-chrome.sh` from the extracted archive;
+`--help` works without installing dependencies. Installed `node_modules` and
+local bridge token configuration are excluded from the archive.
 
 ## Tool surface
 
@@ -154,6 +197,8 @@ submit, upload, delete, purchase, or disclose sensitive information.
 ## Limitations
 
 - Chrome internal pages such as `chrome://extensions` are not scriptable.
+- DOM inspection and targeting currently cover the top-level document, not
+  iframe contents or shadow roots.
 - Chrome can reject debugger attachment when another extension has a frame in
   the page. Keyboard input and screenshots then fail while DOM actions may
   still work. Don't bypass browser security settings to work around this.

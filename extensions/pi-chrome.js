@@ -22,10 +22,7 @@ async function ensureBridge() {
       const next = await ChromeDaemonClient.connect(bridgeOptions());
       bridge = next;
       return next;
-    })().catch(error => {
-      bridgeStart = null;
-      throw error;
-    });
+    })().finally(() => { bridgeStart = null; });
   }
   return await bridgeStart;
 }
@@ -59,17 +56,20 @@ export default function piChromeExtension(pi) {
       // registry accepts the same TSchema shape at runtime; keeping one schema
       // source prevents the MCP and Pi surfaces from drifting.
       parameters: definition.inputSchema,
-      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      async execute(_toolCallId, params, signal, _onUpdate, ctx) {
         try {
+          signal?.throwIfAborted();
           const current = await ensureBridge();
-          await current.waitForExtension(definition.name === "status" ? 5_000 : 3_000);
-          return extensionResult(await callTool(current, definition.name, params ?? {}));
+          signal?.throwIfAborted();
+          await current.waitForExtension(definition.name === "status" ? 5_000 : 3_000, signal);
+          signal?.throwIfAborted();
+          return extensionResult(await callTool(current, definition.name, params ?? {}, { signal }));
         } catch (error) {
           const message = error?.message ?? String(error);
           if (ctx.hasUI) ctx.ui.notify(`Pi Chrome: ${message}`, "error");
           return {
             content: [{ type: "text", text: message }],
-            details: { ok: false, error: { code: error?.code ?? "PI_CHROME_ERROR", message } },
+            details: { ok: false, error: { code: signal?.aborted ? "ABORTED" : error?.code ?? "PI_CHROME_ERROR", message, details: error?.details ?? {} } },
             isError: true,
           };
         }
