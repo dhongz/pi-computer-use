@@ -77,8 +77,10 @@ they do not each bind the browser port.
 ## Browser workflow
 
 1. Call `pi-chrome_status`.
-2. Call `pi-chrome_new_tab` for a new tab, or `pi-chrome_list_tabs` followed by
-   `pi-chrome_claim_tab` for an existing tab.
+2. Call `pi-chrome_new_tab` with a short `group_title` for a new task tab.
+   The bridge creates a blue `Pi · <title>` group and reuses it for later tabs in
+   this session. If the group was closed, it creates a replacement. Existing
+   user tabs can be listed and claimed without moving them into the task group.
 3. Call `pi-chrome_get_state` to obtain a visible DOM snapshot and versioned
    `node_id` values.
 4. Use `pi-chrome_click`, `pi-chrome_fill`, or `pi-chrome_press_key` with a
@@ -86,10 +88,26 @@ they do not each bind the browser port.
 5. Capture a new state after actions. A stale node returns `STALE_STATE` instead
    of silently acting on a different element.
 6. Use `pi-chrome_wait_for` for navigation and asynchronous UI changes.
-7. Call `pi-chrome_release_tab` when the agent should leave a user tab alone.
+7. After saving the result and checking for unsaved work, call
+   `pi-chrome_close_group` to finish the task. Release any claimed user tabs with
+   `pi-chrome_release_tab`; don't close them.
 
 New tabs are claimed by Pi automatically and are inactive by default. Pass
-`active: true` only when the user wants the tab brought to the front.
+`active: true` only when the user wants the tab brought to the front. The default
+group label is `Pi · Browser task`; pass `group_title` to name the task.
+Sessions never share a group based on its title.
+
+Group cleanup closes only tabs created by this session that are still in its
+task group. User tabs dragged into the group, other sessions' tabs, and task tabs
+moved outside the group are preserved. Cleanup reports `closedTabIds` and
+`preservedTabIds` for tabs in the group. It is explicit: a disconnect releases
+ownership without closing tabs. The package includes a `pi-chrome` skill that
+instructs the agent to clean up when finished.
+
+Updating an existing installation requires re-staging the Chrome extension and
+reloading it at `chrome://extensions` to grant the `tabGroups` permission. Restart
+the shared daemon when no sessions own tabs, then run `/reload` in Pi to load the
+new tool and skill.
 
 Existing tabs are not changed until explicitly claimed. Claiming can include an
 expected title and URL so a reused tab id fails closed if the tab changed.
@@ -100,7 +118,8 @@ expected title and URL so a reused tab id fails closed if the tab changed.
 | --- | --- |
 | `pi-chrome_status` | Bridge and extension health, install hint, capabilities |
 | `pi-chrome_list_tabs` | List tabs, ownership, active state, URL, title |
-| `pi-chrome_new_tab` | Create and claim a tab in the existing profile |
+| `pi-chrome_new_tab` | Create and claim a tab in this session's labeled task group |
+| `pi-chrome_close_group` | Close this session's task tabs without closing unrelated tabs |
 | `pi-chrome_claim_tab` | Claim an exact existing tab |
 | `pi-chrome_release_tab` | Release a claimed tab without closing it |
 | `pi-chrome_close_tab` | Close Pi-owned tabs; `force` is required for other tabs |
@@ -135,6 +154,9 @@ submit, upload, delete, purchase, or disclose sensitive information.
 ## Limitations
 
 - Chrome internal pages such as `chrome://extensions` are not scriptable.
+- Chrome can reject debugger attachment when another extension has a frame in
+  the page. Keyboard input and screenshots then fail while DOM actions may
+  still work. Don't bypass browser security settings to work around this.
 - The extension must be loaded once manually because Chrome protects unpacked
   extension installation behind Developer mode.
 - The current daemon uses one browser/control port pair per Chrome profile.

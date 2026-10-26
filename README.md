@@ -139,7 +139,9 @@ Use the `pi_chrome_*` tools in Pi extension mode, or the `pi-chrome_*` MCP
 server tools in MCP-only mode, for websites and local web apps. Both modes share
 one per-profile daemon, so multiple Pi threads do not bind separate browser
 ports. They operate inside Chrome through DOM/browser APIs and do not move the
-macOS pointer. Use the native
+macOS pointer. New task tabs share a labeled `Pi · <task>` group per session.
+The bundled `pi-chrome` skill guides page interaction and calls `close_group`
+when finished, without closing unrelated user tabs. Use the native
 `pi-computer-use_*` tools for Finder, Slack desktop, native settings, and other
 applications that are not browser pages. The native backend remains the fallback
 for canvas and opaque browser regions.

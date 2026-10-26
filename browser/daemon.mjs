@@ -56,6 +56,7 @@ export class ChromeDaemon {
     this.controlWss = null;
     this.clients = new Map();
     this.ownerByTab = new Map();
+    this.taskGroups = new Map();
     this.daemonId = crypto.randomUUID();
   }
 
@@ -168,12 +169,33 @@ export class ChromeDaemon {
       };
     }
 
-    if (method === "new_tab") {
-      const result = await this.bridge.command(method, params);
-      const tabId = id(result.tab?.id);
-      if (tabId === null) throw new DaemonError("TAB_CREATE_FAILED", "Chrome did not return a tab id");
-      this.ownerByTab.set(tabId, { sessionId: client.sessionId, agentOwned: true });
-      return result;
+    if (method === "new_tab" || method === "close_group") {
+      const task = this.taskGroups.get(client.sessionId) ?? { groupId: null, pending: Promise.resolve() };
+      this.taskGroups.set(client.sessionId, task);
+      // Serialize creation and cleanup so parallel tool calls share one group.
+      task.pending = task.pending.catch(() => {}).then(async () => {
+        if (method === "new_tab") {
+          const result = await this.bridge.command(method, { ...params, groupId: task.groupId });
+          const tabId = id(result.tab?.id);
+          if (tabId === null) throw new DaemonError("TAB_CREATE_FAILED", "Chrome did not return a tab id");
+          if (!Number.isInteger(result.tab.groupId) || result.tab.groupId < 0) {
+            await this.bridge.command("close_tab", { tabId });
+            throw new DaemonError("GROUP_UNAVAILABLE", "Chrome bridge did not group the new tab; reload the Chrome extension", { tabId });
+          }
+          task.groupId = result.tab.groupId;
+          this.ownerByTab.set(tabId, { sessionId: client.sessionId, agentOwned: true });
+          return result;
+        }
+        if (task.groupId === null) return { closedTabIds: [], preservedTabIds: [], message: "No task group to close" };
+        const tabIds = [...this.ownerByTab.entries()]
+          .filter(([, owner]) => owner.sessionId === client.sessionId && owner.agentOwned)
+          .map(([tabId]) => tabId);
+        const result = await this.bridge.command(method, { groupId: task.groupId, tabIds });
+        for (const tabId of result.closedTabIds ?? []) this.ownerByTab.delete(tabId);
+        task.groupId = null;
+        return result;
+      });
+      return await task.pending;
     }
 
     if (method === "claim_tab") {
@@ -212,6 +234,8 @@ export class ChromeDaemon {
 
   async releaseSession(client) {
     if (!client.sessionId) return;
+    await this.taskGroups.get(client.sessionId)?.pending.catch(() => {});
+    this.taskGroups.delete(client.sessionId);
     const tabs = [...this.ownerByTab.entries()].filter(([, owner]) => owner.sessionId === client.sessionId).map(([tabId]) => tabId);
     for (const tabId of tabs) {
       try { await this.bridge.command("release_tab", { tabId }); } catch { /* tab may have closed */ }

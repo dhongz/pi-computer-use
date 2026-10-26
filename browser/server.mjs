@@ -98,11 +98,17 @@ export const tools = [
   },
   {
     name: "new_tab",
-    description: "Create a new tab in the user's existing Chrome profile. It is claimed by Pi and is inactive by default unless active=true.",
+    description: "Create a claimed tab in this Pi session's labeled task group, reusing the group if it exists. Inactive by default. Use close_group when the task is done.",
     inputSchema: toolSchema({
       url: { type: "string", description: "Initial URL; defaults to about:blank" },
+      group_title: { type: "string", description: "Short task label for a new group, e.g. Check signup. Chrome displays Pi · <label>. Existing groups keep their label.", minLength: 1, maxLength: 80 },
       active: { type: "boolean", description: "Bring the new tab to the front" },
     }),
+  },
+  {
+    name: "close_group",
+    description: "Finish this session's browser task: close its Pi-created tabs still in the task group. User tabs and tabs moved outside the group are preserved. Check for unsaved work first.",
+    inputSchema: toolSchema(),
   },
   {
     name: "claim_tab",
@@ -224,7 +230,11 @@ function mcpSuccess(toolName, result) {
     result: structuredResult,
   };
   return {
-    content: [{ type: "text", text: summarize(toolName, result) }, ...additionalContent],
+    content: [
+      { type: "text", text: summarize(toolName, result) },
+      { type: "text", text: JSON.stringify(envelope) },
+      ...additionalContent,
+    ],
     structuredContent: envelope,
   };
 }
@@ -433,10 +443,16 @@ export async function callTool(bridge, name, args) {
     case "list_tabs":
       return mcpSuccess(name, await bridge.command("list_tabs"));
     case "new_tab":
+      if (args?.group_title !== undefined && (typeof args.group_title !== "string" || !args.group_title.trim() || args.group_title.length > 80)) {
+        throw new BridgeError("INVALID_PARAMS", "group_title must be a non-empty string of at most 80 characters");
+      }
       return mcpSuccess(name, await bridge.command("new_tab", {
         url: allowedBrowserUrl(args?.url || "about:blank"),
         active: args?.active === true,
+        groupTitle: args?.group_title?.trim() ?? "Browser task",
       }));
+    case "close_group":
+      return mcpSuccess(name, await bridge.command("close_group"));
     case "claim_tab":
       return mcpSuccess(name, await bridge.command("claim_tab", {
         tabId: requiredInteger(args, "tab_id"),

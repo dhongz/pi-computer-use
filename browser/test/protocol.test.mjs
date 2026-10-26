@@ -99,7 +99,7 @@ try {
   const newTabPromise = clientOne.command("new_tab", { url: "https://example.com", active: false });
   const newTabCommand = await nextCommand();
   assert.equal(newTabCommand.method, "new_tab");
-  respond(newTabCommand, { tab: { id: 123, url: "https://example.com/" }, message: "Created test tab" });
+  respond(newTabCommand, { tab: { id: 123, groupId: 7, url: "https://example.com/" }, message: "Created test tab" });
   const newTab = await newTabPromise;
   assert.equal(newTab.tab.id, 123);
 
